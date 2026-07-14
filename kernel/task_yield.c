@@ -1,0 +1,82 @@
+#include "rts/rts_task.h"
+
+#include <stdbool.h>
+
+#include "assert_internal.h"
+#include "port.h"
+#include "scheduler_internal.h"
+
+static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
+{
+    const rts_tcb_t *current = kernel->current_task;
+
+    return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
+           rts_scheduler_current_is_valid() &&
+           rts_ready_is_front(&kernel->ready_set, current) &&
+           !kernel->switch_plan.active;
+}
+
+rts_status_t rts_task_yield(void)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    rts_critical_token_t critical_token;
+    rts_tcb_t *current;
+    rts_tcb_t *selected;
+    bool coherent;
+    bool notify_port = false;
+
+    if (rts_port_is_in_isr())
+    {
+        return RTS_STATUS_INVALID_CONTEXT;
+    }
+    if (kernel->lifecycle != RTS_KERNEL_RUNNING)
+    {
+        return RTS_STATUS_INVALID_STATE;
+    }
+
+    critical_token = rts_port_critical_enter();
+    if (kernel->lifecycle != RTS_KERNEL_RUNNING)
+    {
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_INVALID_STATE;
+    }
+
+    coherent = rts_yield_current_is_coherent(kernel);
+    RTS_ASSERT(coherent);
+    if (!coherent)
+    {
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_INVALID_STATE;
+    }
+
+    current = kernel->current_task;
+    current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+    if (!rts_ready_has_peer(&kernel->ready_set, current))
+    {
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_OK;
+    }
+
+    rts_ready_rotate(&kernel->ready_set, current->priority);
+    selected = rts_scheduler_select_highest_ready();
+    RTS_ASSERT(selected != NULL);
+    RTS_ASSERT(selected != current);
+    RTS_ASSERT(selected == NULL || selected->priority == current->priority);
+    RTS_ASSERT(selected == NULL || selected->state == RTS_TASK_STATE_READY);
+    if (selected == NULL || selected == current ||
+        selected->priority != current->priority ||
+        selected->state != RTS_TASK_STATE_READY)
+    {
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_INVALID_STATE;
+    }
+
+    notify_port = rts_scheduler_prepare_switch(selected);
+    rts_port_critical_exit(critical_token);
+
+    if (notify_port)
+    {
+        rts_port_request_context_switch();
+    }
+    return RTS_STATUS_OK;
+}
