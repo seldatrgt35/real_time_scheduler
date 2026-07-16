@@ -20,5 +20,7 @@ _Static_assert((RTS_TASK_STACK_ALIGNMENT & (RTS_TASK_STACK_ALIGNMENT - 1u)) == 0
                "stack alignment must be a power of two");
 _Static_assert(RTS_IDLE_STACK_SIZE_BYTES > 0,
                "idle stack size must be nonzero");
+_Static_assert(RTS_TIME_SLICE_TICKS <= UINT32_MAX,
+               "time-slice quantum must fit in rts_tick_t");
 
 #endif /* RTS_CONFIG_INTERNAL_H */

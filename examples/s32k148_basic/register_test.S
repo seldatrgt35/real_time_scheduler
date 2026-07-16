@@ -12,9 +12,6 @@ rts_smoke_verify_registers:
     stmdb   sp!, {r4-r11}
     push    {r0, lr}
     ldmia   r0, {r4-r11}
-    bl      rts_task_yield
-    cmp     r0, #0
-    bne     .Lyield_failure
 
     ldr     r0, [sp, #0]
     ldr     r1, [r0, #0]
@@ -47,8 +44,6 @@ rts_smoke_verify_registers:
 .Lregister_failure:
     movs    r0, #1
     b       .Lregister_done
-.Lyield_failure:
-    movs    r0, #2
 .Lregister_done:
     pop     {r1, lr}
     ldmia   sp!, {r4-r11}

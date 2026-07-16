@@ -7,6 +7,8 @@
 #define SysTick_CTRL_ENABLE_Msk    (UINT32_C(1) << 0)
 #define SysTick_CTRL_TICKINT_Msk   (UINT32_C(1) << 1)
 #define SysTick_CTRL_CLKSOURCE_Msk (UINT32_C(1) << 2)
+#define CONTROL_SPSEL_Msk          (UINT32_C(1) << 1)
+#define CONTROL_FPCA_Msk           (UINT32_C(1) << 2)
 
 typedef struct
 {
@@ -26,6 +28,9 @@ extern SysTick_Type rts_test_systick;
 extern SCB_Type rts_test_scb;
 extern uint32_t rts_test_primask;
 extern uint32_t rts_test_ipsr;
+extern uint32_t rts_test_psp;
+extern uint32_t rts_test_msp;
+extern uint32_t rts_test_control;
 extern unsigned int rts_test_dsb_count;
 extern unsigned int rts_test_isb_count;
 
@@ -40,6 +45,21 @@ static inline uint32_t __get_PRIMASK(void)
 static inline uint32_t __get_IPSR(void)
 {
     return rts_test_ipsr;
+}
+
+static inline uint32_t __get_PSP(void)
+{
+    return rts_test_psp;
+}
+
+static inline uint32_t __get_MSP(void)
+{
+    return rts_test_msp;
+}
+
+static inline uint32_t __get_CONTROL(void)
+{
+    return rts_test_control;
 }
 
 static inline void __DSB(void)

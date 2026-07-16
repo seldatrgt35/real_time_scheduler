@@ -16,7 +16,8 @@ enum
     RTS_SMOKE_FAILURE_ARGUMENT = UINT32_C(1) << 6,
     RTS_SMOKE_FAILURE_STACK_GUARD = UINT32_C(1) << 7,
     RTS_SMOKE_FAILURE_HANDLER_STACK = UINT32_C(1) << 8,
-    RTS_SMOKE_FAILURE_YIELD = UINT32_C(1) << 9
+    RTS_SMOKE_FAILURE_YIELD = UINT32_C(1) << 9,
+    RTS_SMOKE_FAILURE_CREATE_C = UINT32_C(1) << 10
 };
 
 typedef struct
@@ -24,15 +25,24 @@ typedef struct
     volatile uint32_t failure_flags;
     volatile uint32_t task_a_count;
     volatile uint32_t task_b_count;
+    volatile uint32_t task_c_count;
     volatile uint32_t task_a_psp;
     volatile uint32_t task_b_psp;
     volatile uint32_t task_a_msp;
     volatile uint32_t task_b_msp;
     volatile uint32_t task_a_control;
     volatile uint32_t task_b_control;
+    volatile uint32_t task_c_psp;
+    volatile uint32_t task_c_msp;
+    volatile uint32_t task_c_control;
     volatile uint32_t task_a_argument_seen;
     volatile uint32_t task_b_argument_seen;
+    volatile uint32_t task_c_argument_seen;
     volatile rts_tick_t observed_tick;
+    volatile uint32_t current_task_identifier;
+    volatile uint32_t last_low_priority_identifier;
+    volatile uint32_t task_a_wakeup_count;
+    volatile uint32_t time_slice_rotation_count;
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;

@@ -172,6 +172,7 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
     {
         RTS_FATAL_UNLESS(snapshot->from->state == RTS_TASK_STATE_BLOCKED);
     }
+    snapshot->to->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     snapshot->to->state = RTS_TASK_STATE_RUNNING;
     kernel->current_task = snapshot->to;
     rts_switch_plan_clear(plan);

@@ -690,3 +690,38 @@ endfunction()
 
 rts_add_task_delay_test(rts_test_task_delay tests/config)
 rts_add_task_delay_test(rts_test_task_delay_release tests/config_release)
+rts_add_task_delay_test(rts_test_task_delay_no_slicing tests/config_no_slicing)
+
+function(rts_add_time_slicing_test target config_directory)
+    add_executable(${target}
+        unit/test_time_slicing.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_time_slicing_test(rts_test_time_slicing_quantum_one
+                          tests/config_quantum_one)
+rts_add_time_slicing_test(rts_test_time_slicing_quantum_five
+                          tests/config_quantum_five)
+rts_add_time_slicing_test(rts_test_time_slicing_release
+                          tests/config_release)
+rts_add_time_slicing_test(rts_test_time_slicing_disabled
+                          tests/config_no_slicing)

@@ -1,12 +1,12 @@
 #ifndef RTS_CONFIG_H
 #define RTS_CONFIG_H
 
-#define RTS_MAX_TASKS                 3u
+#define RTS_MAX_TASKS                 4u
 #define RTS_PRIORITY_COUNT            8u
 #define RTS_TICK_RATE_HZ              1000u
 #define RTS_ENABLE_TIME_SLICING       1
-#define RTS_TIME_SLICE_TICKS          5u
+#define RTS_TIME_SLICE_TICKS          1u
 #define RTS_ENABLE_ASSERTIONS         1
-#define RTS_IDLE_STACK_SIZE_BYTES     512u
+#define RTS_IDLE_STACK_SIZE_BYTES     256u
 
 #endif /* RTS_CONFIG_H */

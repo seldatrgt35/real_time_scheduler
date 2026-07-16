@@ -67,6 +67,7 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     RTS_FATAL_UNLESS(!rts_ready_contains(&kernel->ready_set, current));
 
     current->wait.reason = RTS_WAIT_DELAY;
+    current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     current->state = RTS_TASK_STATE_BLOCKED;
     rts_delay_insert(&kernel->delay_queue, current);
     RTS_FATAL_UNLESS(rts_scheduler_task_is_blocked_delay(current));

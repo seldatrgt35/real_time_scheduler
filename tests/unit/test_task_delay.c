@@ -159,6 +159,7 @@ static void test_block_switch_wake_and_wrap(void)
     CHECK(rts_host_port_test_switch_request_count() == 2u);
     complete_pending_switch();
     CHECK(kernel->current_task == a && a->state == RTS_TASK_STATE_RUNNING);
+    CHECK(a->slice_remaining == (rts_tick_t)RTS_TIME_SLICE_TICKS);
     CHECK(b->state == RTS_TASK_STATE_READY);
 }
 

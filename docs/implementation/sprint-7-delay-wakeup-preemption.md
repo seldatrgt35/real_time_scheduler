@@ -159,9 +159,9 @@ ticks. B increments while A is blocked; A's expiry prepares deferred PendSV and
 preempts B. The debugger record continues to expose both counters, sampled tick,
 PSP/MSP evidence, stack guards, and failure flags.
 
-## Remaining Sprint 7C work
+## Sprint 7C completion
 
-Sprint 7C owns tick-driven slice decrement, quantum expiry, equal-priority FIFO
-rotation, combined wakeup/slice selection, final integration acceptance, and
-physical timing evidence. Sprint 7B deliberately resets quantum on wake but
-never decrements it.
+Sprint 7C now owns the implemented tick-driven slice decrement, quantum expiry,
+equal-priority FIFO rotation, combined wakeup/slice selection, and final
+software integration acceptance. Sprint 7B's wakeup reset remains the input to
+that completed accounting model. Physical timing evidence is still pending.

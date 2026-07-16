@@ -15,6 +15,7 @@
 #define RTS_SMOKE_GUARD_VALUE      UINT8_C(0xa5)
 #define RTS_SMOKE_TASK_A_ID        UINT32_C(0xa11a0001)
 #define RTS_SMOKE_TASK_B_ID        UINT32_C(0xb22b0002)
+#define RTS_SMOKE_TASK_C_ID        UINT32_C(0xc33c0003)
 
 typedef struct
 {
@@ -30,6 +31,7 @@ typedef struct
 
 RTS_TASK_STACK_DECLARE(g_task_a_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_b_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_c_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 
 rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
 
@@ -44,6 +46,12 @@ static const uint32_t g_task_b_patterns[8] = {
     UINT32_C(0xb6060606), UINT32_C(0xb7070707),
     UINT32_C(0xb8080808), UINT32_C(0xb9090909),
     UINT32_C(0xba101010), UINT32_C(0xbb111111)
+};
+static const uint32_t g_task_c_patterns[8] = {
+    UINT32_C(0xc4040404), UINT32_C(0xc5050505),
+    UINT32_C(0xc6060606), UINT32_C(0xc7070707),
+    UINT32_C(0xc8080808), UINT32_C(0xc9090909),
+    UINT32_C(0xca101010), UINT32_C(0xcb111111)
 };
 
 static rts_smoke_task_argument_t g_task_a_argument = {
@@ -65,6 +73,16 @@ static rts_smoke_task_argument_t g_task_b_argument = {
     &g_rts_s32k148_smoke_record.task_b_control,
     g_task_b_stack,
     g_task_b_patterns
+};
+static rts_smoke_task_argument_t g_task_c_argument = {
+    RTS_SMOKE_TASK_C_ID,
+    &g_rts_s32k148_smoke_record.task_c_count,
+    &g_rts_s32k148_smoke_record.task_c_argument_seen,
+    &g_rts_s32k148_smoke_record.task_c_psp,
+    &g_rts_s32k148_smoke_record.task_c_msp,
+    &g_rts_s32k148_smoke_record.task_c_control,
+    g_task_c_stack,
+    g_task_c_patterns
 };
 
 static void rts_smoke_guard_initialize(unsigned char *stack)
@@ -101,6 +119,10 @@ static void rts_smoke_task(void *argument)
     else if (task == &g_task_b_argument)
     {
         expected_id = RTS_SMOKE_TASK_B_ID;
+    }
+    else if (task == &g_task_c_argument)
+    {
+        expected_id = RTS_SMOKE_TASK_C_ID;
     }
     else
     {
@@ -139,6 +161,18 @@ static void rts_smoke_task(void *argument)
     for (;;)
     {
         ++(*task->counter);
+        g_rts_s32k148_smoke_record.current_task_identifier = task->identifier;
+        if (task != &g_task_a_argument)
+        {
+            uint32_t previous =
+                g_rts_s32k148_smoke_record.last_low_priority_identifier;
+            if (previous != 0u && previous != task->identifier)
+            {
+                ++g_rts_s32k148_smoke_record.time_slice_rotation_count;
+            }
+            g_rts_s32k148_smoke_record.last_low_priority_identifier =
+                task->identifier;
+        }
         g_rts_s32k148_smoke_record.observed_tick = rts_kernel_tick_now();
         if (!rts_smoke_guard_is_valid(task->stack))
         {
@@ -165,6 +199,10 @@ static void rts_smoke_task(void *argument)
             g_rts_s32k148_smoke_record.failure_flags |=
                 RTS_SMOKE_FAILURE_YIELD;
         }
+        else if (task == &g_task_a_argument)
+        {
+            ++g_rts_s32k148_smoke_record.task_a_wakeup_count;
+        }
     }
 }
 
@@ -172,6 +210,7 @@ int main(void)
 {
     rts_task_handle_t task_a = NULL;
     rts_task_handle_t task_b = NULL;
+    rts_task_handle_t task_c = NULL;
     const rts_task_config_t config_a = {
         .entry = rts_smoke_task,
         .argument = &g_task_a_argument,
@@ -186,9 +225,17 @@ int main(void)
         .stack_size_bytes = sizeof(g_task_b_stack),
         .priority = 2u
     };
+    const rts_task_config_t config_c = {
+        .entry = rts_smoke_task,
+        .argument = &g_task_c_argument,
+        .stack_buffer = g_task_c_stack,
+        .stack_size_bytes = sizeof(g_task_c_stack),
+        .priority = 2u
+    };
 
     rts_smoke_guard_initialize(g_task_a_stack);
     rts_smoke_guard_initialize(g_task_b_stack);
+    rts_smoke_guard_initialize(g_task_c_stack);
     if (rts_init() != RTS_STATUS_OK)
     {
         g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_INIT;
@@ -206,13 +253,19 @@ int main(void)
             RTS_SMOKE_FAILURE_CREATE_B;
         return 3;
     }
+    if (rts_task_create(&config_c, &task_c) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_CREATE_C;
+        return 4;
+    }
     if (rts_start() != RTS_STATUS_OK)
     {
         g_rts_s32k148_smoke_record.failure_flags |=
             RTS_SMOKE_FAILURE_START_RETURNED;
-        return 4;
+        return 5;
     }
     g_rts_s32k148_smoke_record.failure_flags |=
         RTS_SMOKE_FAILURE_START_RETURNED;
-    return 5;
+    return 6;
 }

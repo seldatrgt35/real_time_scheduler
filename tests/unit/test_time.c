@@ -75,6 +75,34 @@ bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task)
     return false;
 }
 
+bool rts_scheduler_task_is_idle(const rts_tcb_t *task)
+{
+    (void)task;
+    return false;
+}
+
+bool rts_ready_is_front(const rts_ready_set_t *ready_set,
+                        const rts_tcb_t *task)
+{
+    (void)ready_set;
+    (void)task;
+    return false;
+}
+
+bool rts_ready_has_peer(const rts_ready_set_t *ready_set,
+                        const rts_tcb_t *task)
+{
+    (void)ready_set;
+    (void)task;
+    return false;
+}
+
+void rts_ready_rotate(rts_ready_set_t *ready_set, rts_priority_t priority)
+{
+    (void)ready_set;
+    (void)priority;
+}
+
 rts_tcb_t *rts_scheduler_select_highest_ready(void)
 {
     return NULL;
@@ -196,7 +224,7 @@ static void test_invalid_entry_does_not_mutate(void)
 
 static void test_unrelated_state_is_unchanged(void)
 {
-    rts_tcb_t sentinel_task;
+    rts_tcb_t sentinel_task = {0};
 
     reset_state(RTS_KERNEL_RUNNING, true);
     test_kernel.current_task = &sentinel_task;

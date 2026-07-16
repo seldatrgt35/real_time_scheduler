@@ -15,7 +15,8 @@ file(READ "${DISASSEMBLY_FILE}" disassembly)
 foreach(required Reset_Handler SVC_Handler PendSV_Handler SysTick_Handler
                  HardFault_Handler
                  rts_kernel_tick_advance
-                 g_pfnVectors __StackTop g_task_a_stack g_task_b_stack)
+                 g_pfnVectors __StackTop
+                 g_task_a_stack g_task_b_stack g_task_c_stack)
     string(REGEX MATCHALL "(^|\n)[0-9a-fA-F]+[ \t]+[A-Za-z][ \t]+${required}(\r?\n|$)"
            matches "${symbols}")
     list(LENGTH matches match_count)

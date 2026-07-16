@@ -42,6 +42,49 @@ static bool rts_tick_wake_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
     return rts_scheduler_task_is_runnable(task);
 }
 
+static bool rts_tick_account_current_slice(rts_kernel_state_t *kernel,
+                                           rts_tick_t elapsed_ticks)
+{
+#if RTS_ENABLE_TIME_SLICING
+    rts_tcb_t *current = kernel->current_task;
+    bool coherent;
+
+    if (current == NULL || current->state != RTS_TASK_STATE_RUNNING ||
+        rts_scheduler_task_is_idle(current) || kernel->switch_plan.active ||
+        !rts_ready_is_front(&kernel->ready_set, current))
+    {
+        return false;
+    }
+
+    coherent = rts_scheduler_current_is_valid() &&
+               current->slice_remaining > 0u;
+    RTS_FATAL_UNLESS(coherent);
+    if (!coherent)
+    {
+        return false;
+    }
+
+    if (elapsed_ticks < current->slice_remaining)
+    {
+        current->slice_remaining -= elapsed_ticks;
+        return false;
+    }
+
+    current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+    if (!rts_ready_has_peer(&kernel->ready_set, current))
+    {
+        return false;
+    }
+
+    rts_ready_rotate(&kernel->ready_set, current->priority);
+    return true;
+#else
+    (void)kernel;
+    (void)elapsed_ticks;
+    return false;
+#endif
+}
+
 bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
@@ -49,6 +92,8 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     rts_tcb_t *selected;
     rts_tcb_t *current;
     bool woke_task = false;
+    bool current_woke = false;
+    bool slice_rotated;
     bool valid = kernel->lifecycle == RTS_KERNEL_RUNNING &&
                  rts_port_is_in_isr() && elapsed_ticks != 0u &&
                  elapsed_ticks <= RTS_TICK_MAX_ADVANCE;
@@ -68,6 +113,10 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
         {
             break;
         }
+        if (expired == kernel->current_task)
+        {
+            current_woke = true;
+        }
         if (!rts_tick_wake_task(kernel, expired))
         {
             return false;
@@ -75,7 +124,10 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
         woke_task = true;
     }
 
-    if (!woke_task)
+    slice_rotated = !current_woke &&
+                    rts_tick_account_current_slice(kernel, elapsed_ticks);
+
+    if (!woke_task && !slice_rotated)
     {
         return false;
     }
@@ -105,7 +157,8 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
     if (current->state != RTS_TASK_STATE_RUNNING ||
         !rts_scheduler_current_is_valid() ||
-        selected->priority <= current->priority)
+        selected->priority < current->priority ||
+        (selected->priority == current->priority && !slice_rotated))
     {
         return false;
     }

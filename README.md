@@ -4,7 +4,7 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. The portable kernel, Cortex-M4F startup/context-switch paths, scheduler tick, delayed blocking/wakeup preemption, and an SDK-dependent S32K148 SysTick smoke image are implemented. Physical target validation and tick-driven time slicing are not yet complete. The project is not currently safety-certified or ready for production deployment.
+> **Project status:** Active development. The portable kernel, Cortex-M4F startup/context-switch paths, scheduler tick, delayed blocking/wakeup preemption, tick-driven equal-priority time slicing, and an SDK-dependent S32K148 SysTick smoke image are implemented. Physical target validation is not yet complete. The project is not currently safety-certified or ready for production deployment.
 
 ## Design goals
 
@@ -33,6 +33,7 @@ The repository currently includes:
 - immutable switch planning and public task-yield integration;
 - public relative task delay, ordered wakeup, and higher-priority preemption;
 - a portable wrap-safe tick core and S32K148 SysTick source;
+- compile-time optional tick-driven equal-priority round robin;
 - the public scheduler-start transaction;
 - a deterministic host port and focused host tests;
 - a Cortex-M4F 64-byte initial task frame;
@@ -41,8 +42,7 @@ The repository currently includes:
 
 The following Version 1 work remains:
 
-- time-slice expiry processing;
-- physical S32K148 validation of the implemented startup, vector, linker, and cooperative smoke image;
+- physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
 Synchronization primitives, runtime task creation, task deletion, EDF, rate-monotonic policy support, and floating-point context switching are intentionally outside the current baseline.

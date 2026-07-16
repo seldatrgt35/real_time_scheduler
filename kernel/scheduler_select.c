@@ -165,6 +165,7 @@ bool rts_scheduler_current_establish(rts_tcb_t *task)
     }
 
     task->state = RTS_TASK_STATE_RUNNING;
+    task->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     kernel->current_task = task;
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
     return rts_scheduler_current_is_valid();
