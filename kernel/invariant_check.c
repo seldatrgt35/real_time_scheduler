@@ -9,6 +9,7 @@
 #include "scheduler_internal.h"
 #include "stack_check_internal.h"
 #include "time_internal.h"
+#include "timer_internal.h"
 #include "wait_object_internal.h"
 
 #if RTS_ENABLE_INVARIANT_CHECKS
@@ -270,7 +271,8 @@ bool rts_kernel_validate_all(void)
     size_t index;
     size_t allocated = 0u;
 
-    if (!rts_scheduler_validate_internal() || !rts_sync_validate_internal())
+    if (!rts_scheduler_validate_internal() || !rts_sync_validate_internal() ||
+        !rts_timer_manager_validate(rts_timer_manager_get()))
     {
         return false;
     }

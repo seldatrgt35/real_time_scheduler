@@ -24,6 +24,11 @@ typedef struct
     uint32_t mutex_timeouts;
     uint32_t priority_raises;
     uint32_t priority_restorations;
+    uint32_t timer_initializations;
+    uint32_t timer_starts;
+    uint32_t timer_stops;
+    uint32_t timer_restarts;
+    uint32_t timer_expirations;
 } rts_runtime_counters_t;
 
 typedef struct

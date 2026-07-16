@@ -41,6 +41,8 @@ The repository currently includes:
 - centralized fatal/assert handling and S32K148 HardFault evidence capture;
 - optional stack guards, stack watermarking, runtime counters, private
   snapshots, a fixed trace ring, and bounded global invariant validation;
+- statically pooled one-shot and periodic software-timer infrastructure with a
+  dedicated ordered queue and callback-free expiration detection;
 - deterministic 20,000-event diagnostics stress tests in enabled, release, and
   no-time-slicing configurations;
 - the public scheduler-start transaction;
@@ -54,9 +56,9 @@ The following Version 1 work remains:
 - physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
-Software timers, runtime task creation, task deletion, EDF, rate-monotonic
-policy support, and floating-point context switching remain outside the current
-baseline.
+Software-timer callback execution and periodic re-arming, runtime task creation,
+task deletion, EDF, rate-monotonic policy support, and floating-point context
+switching remain outside the current baseline.
 
 ## Scheduling model
 
@@ -100,6 +102,13 @@ rts_status_t rts_semaphore_give_from_isr(
 rts_status_t rts_mutex_init(rts_mutex_t *mutex);
 rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout);
 rts_status_t rts_mutex_unlock(rts_mutex_t *mutex);
+
+rts_status_t rts_timer_init(const rts_timer_config_t *config,
+                            rts_timer_handle_t *out_handle);
+rts_status_t rts_timer_start(rts_timer_handle_t timer);
+rts_status_t rts_timer_stop(rts_timer_handle_t timer);
+rts_status_t rts_timer_restart(rts_timer_handle_t timer);
+bool rts_timer_is_running(rts_timer_handle_t timer);
 ```
 
 Application tasks are registered only after `rts_init()` and before `rts_start()`. A successful embedded start transfers execution to the selected task and normally does not return.
@@ -111,6 +120,8 @@ Semaphore objects are caller-owned, zero-initialized static objects. An initiali
 All memory is statically bounded:
 
 - the kernel owns `RTS_MAX_TASKS` private application TCB objects;
+- the kernel owns `RTS_MAX_TIMERS` private software-timer objects and their
+  dedicated ordered queue;
 - the kernel owns a separate private idle TCB and idle stack;
 - the application owns every application-task stack for the task's lifetime;
 - a successful opaque task handle points directly to a stable private TCB; and
@@ -176,6 +187,7 @@ Every build selects exactly one `rts_config.h`. The current private and public c
 | Macro | Purpose |
 | --- | --- |
 | `RTS_MAX_TASKS` | Number of application-task pool slots |
+| `RTS_MAX_TIMERS` | Number of private software-timer pool slots |
 | `RTS_PRIORITY_COUNT` | Total priority levels, including idle priority zero |
 | `RTS_TICK_RATE_HZ` | Scheduler tick frequency |
 | `RTS_ENABLE_TIME_SLICING` | Enables equal-priority time slicing |
@@ -253,6 +265,7 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Sprint 6 acceptance review](docs/architecture/sprint-6-acceptance-review.md)
 - [Sprint 9 diagnostics implementation](docs/implementation/sprint-9-kernel-diagnostics.md)
 - [Sprint 9 acceptance review](docs/architecture/sprint-9-acceptance-review.md)
+- [Sprint 10A timer infrastructure](docs/implementation/sprint-10a-timer-infrastructure.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -270,8 +283,7 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 
 1. Run the long-duration S32K148 smoke and deliberate fault-capture image.
 2. Measure target stack margins, context-switch latency, and critical windows.
-3. Implement statically allocated Software Timers without callbacks in the tick
-   critical path.
+3. Complete Software Timer callback execution and periodic policy in Sprint 10B.
 4. Complete production-readiness and safety-analysis activities before deployment.
 
 ## License

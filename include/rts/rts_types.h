@@ -14,6 +14,10 @@
 #error "RTS_PRIORITY_COUNT must be defined by the selected rts_config.h"
 #endif
 
+#if !defined(RTS_MAX_TIMERS)
+#error "RTS_MAX_TIMERS must be defined by the selected rts_config.h"
+#endif
+
 #if !defined(RTS_TICK_RATE_HZ)
 #error "RTS_TICK_RATE_HZ must be defined by the selected rts_config.h"
 #endif
@@ -49,6 +53,10 @@
 
 #if (RTS_MAX_TASKS < 1)
 #error "RTS_MAX_TASKS must be at least 1"
+#endif
+
+#if (RTS_MAX_TIMERS < 1)
+#error "RTS_MAX_TIMERS must be at least 1"
 #endif
 
 #if (RTS_PRIORITY_COUNT < 2) || (RTS_PRIORITY_COUNT > 256)

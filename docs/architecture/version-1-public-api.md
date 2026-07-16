@@ -9,6 +9,8 @@ The API is deliberately small, uses only C11 and standard integer/size types, re
 
 - `rts/rts.h` owns only the `rts_init()` and `rts_start()` lifecycle declarations. No stop, reset, deinitialize, state-query, or symmetric-but-unused lifecycle operation exists in version 1.
 - `rts/rts_task.h` owns static creation, yield, and relative delay. There is no current-task query or identity accessor because version 1 has no API that needs a handle to the current task.
+- `rts/rts_timer.h` owns the opaque software-timer handle, descriptor, modes,
+  startup registration, and task-context control/query operations.
 - `rts/rts_types.h` owns status, tick, priority, opaque handle, entry signature, task descriptor, the stack declaration macro, and public configuration validation.
 
 ## 2. Architecture amendment: kernel-owned static TCB pool
@@ -108,7 +110,10 @@ Version 1 has no numeric ID and no task name. The opaque handle is the sole iden
 
 `rts_types.h` directly includes exactly one selected `rts_config.h`; this prevents an application translation unit from using public types without the configuration that defines their contract. CMake supplies one configuration include directory to the entire final image and must reject multiple configuration providers.
 
-Required macros are `RTS_MAX_TASKS`, `RTS_PRIORITY_COUNT`, `RTS_TICK_RATE_HZ`, `RTS_ENABLE_TIME_SLICING`, `RTS_TIME_SLICE_TICKS`, `RTS_IDLE_STACK_SIZE_BYTES`, and `RTS_ENABLE_ASSERTIONS`. Public preprocessing checks the API-affecting values; private headers check idle-stack, representation, and port constraints.
+Required capacity macros include `RTS_MAX_TASKS` and `RTS_MAX_TIMERS`, alongside
+`RTS_PRIORITY_COUNT`, `RTS_TICK_RATE_HZ`, time-slicing, idle-stack, assertion,
+and diagnostic selections. Public preprocessing checks API-affecting values;
+private headers check representation and port constraints.
 
 `rts_tick_t` is always `uint32_t`, priority is always `uint8_t`, and public stack alignment is always 16 bytes. The private TCB may vary with reviewed private configuration without changing public layout. Configuration contains no MCU clock, vector, CMSIS, or SDK value.
 
@@ -229,3 +234,19 @@ Yield rotates only equal-priority peers, never admits lower-priority work solely
 Priority zero is reserved for idle; applications use `1..RTS_PRIORITY_COUNT-1`; larger numeric values have greater scheduling priority. No public operation is ISR-safe, and ISR calls return `INVALID_CONTEXT` where detectable and assert when configured.
 
 Every public translation unit includes the same selected `rts_config.h`. Configuration supplies application-pool capacity, priority count, tick frequency, time-slicing choice/quantum, and assertion choice. Public tick width and stack alignment are fixed; private TCB layout is not a public ABI dependency.
+
+## Sprint 10A software-timer amendment
+
+Sprint 10A adds `rts/rts_timer.h`, opaque `rts_timer_handle_t`, one-shot and
+periodic modes, `rts_timer_config_t`, and `rts_timer_init`, `rts_timer_start`,
+`rts_timer_stop`, `rts_timer_restart`, and `rts_timer_is_running`.
+`RTS_MAX_TIMERS` is the compile-time private pool capacity. Registration is
+allowed only in INITIALIZED; start/stop/restart are task-context operations in
+INITIALIZED or RUNNING. Handles point directly to stable private typed pool
+objects and are never application-dereferenceable.
+
+The descriptor period is relative and limited to `1..RTS_DELAY_MAX`. Callback
+and argument pointers are copied; their referenced lifetimes must cover all
+future use. Sprint 10A stores but never invokes callbacks. Tick expiration only
+changes private timer state to EXPIRED, so this amendment adds no callback
+execution context, task wakeup, or scheduling behavior.

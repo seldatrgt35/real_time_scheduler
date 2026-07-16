@@ -34,6 +34,8 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
     ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
     ${PROJECT_SOURCE_DIR}/kernel/mutex.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_queue.c
     ${PROJECT_SOURCE_DIR}/kernel/fatal.c
     ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
     ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c

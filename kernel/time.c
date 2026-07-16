@@ -10,6 +10,7 @@
 #include "mutex_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "timer_internal.h"
 
 rts_tick_t rts_kernel_tick_now(void)
 {
@@ -152,6 +153,8 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
         }
         woke_task = true;
     }
+
+    rts_timer_manager_process_expired(kernel->current_tick);
 
     slice_rotated = !current_woke &&
                     rts_tick_account_current_slice(kernel, elapsed_ticks);

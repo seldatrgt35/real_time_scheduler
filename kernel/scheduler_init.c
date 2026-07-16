@@ -6,6 +6,7 @@
 #include "port.h"
 #include "scheduler_internal.h"
 #include "stack_check_internal.h"
+#include "timer_internal.h"
 
 static void rts_idle_entry(void *argument)
 {
@@ -105,6 +106,7 @@ rts_status_t rts_init(void)
     rts_task_pool_initialize(&kernel->application_task_pool);
     rts_ready_initialize(&kernel->ready_set);
     rts_delay_initialize(&kernel->delay_queue);
+    rts_timer_manager_initialize();
 
     port_status = rts_port_initialize();
     if (port_status != RTS_STATUS_OK)

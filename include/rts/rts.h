@@ -5,6 +5,7 @@
 #include "rts/rts_task.h"
 #include "rts/rts_semaphore.h"
 #include "rts/rts_mutex.h"
+#include "rts/rts_timer.h"
 
 #ifdef __cplusplus
 extern "C" {

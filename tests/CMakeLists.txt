@@ -371,6 +371,8 @@ add_test(NAME rts_task_create COMMAND rts_test_task_create)
 
 add_library(rts_kernel_bootstrap STATIC
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_init.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_queue.c
 )
 
 target_include_directories(rts_kernel_bootstrap
@@ -556,6 +558,8 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
     ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
     ${PROJECT_SOURCE_DIR}/kernel/mutex.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_queue.c
     ${PROJECT_SOURCE_DIR}/kernel/fatal.c
     ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
     ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c
@@ -852,3 +856,32 @@ endfunction()
 rts_add_diagnostics_test(rts_test_diagnostics tests/config)
 rts_add_diagnostics_test(rts_test_diagnostics_release tests/config_release)
 rts_add_diagnostics_test(rts_test_diagnostics_no_slicing tests/config_no_slicing)
+
+function(rts_add_timer_test target config_directory)
+    add_executable(${target}
+        unit/test_timer.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_timer_test(rts_test_timer tests/config)
+rts_add_timer_test(rts_test_timer_release tests/config_release)
+rts_add_timer_test(rts_test_timer_no_slicing tests/config_no_slicing)
