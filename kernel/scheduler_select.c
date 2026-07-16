@@ -1,6 +1,8 @@
 #include "scheduler_internal.h"
 
 #include "assert_internal.h"
+#include "rts/rts_mutex.h"
+#include "rts/rts_semaphore.h"
 
 bool rts_scheduler_task_is_idle(const rts_tcb_t *task)
 {
@@ -21,8 +23,16 @@ static bool rts_scheduler_task_is_runnable_in(
         task->stack_low == NULL || task->stack_high == NULL ||
         (uintptr_t)task->stack_low >= (uintptr_t)task->stack_high ||
         task->entry == NULL || task->wait.reason != RTS_WAIT_NONE ||
+        task->wait.object != NULL || task->wait.timeout_active ||
+        task->wait_node.owner != NULL ||
         task->delay_node.owner != NULL ||
         !rts_ready_contains(&kernel->ready_set, task))
+    {
+        return false;
+    }
+
+    if (task->priority < task->base_priority ||
+        (size_t)task->base_priority >= (size_t)RTS_PRIORITY_COUNT)
     {
         return false;
     }
@@ -76,6 +86,8 @@ bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task)
     valid = task->slot_state == RTS_TASK_SLOT_ALLOCATED &&
             task->state == RTS_TASK_STATE_BLOCKED &&
             task->wait.reason == RTS_WAIT_DELAY &&
+            task->wait.object == NULL && !task->wait.timeout_active &&
+            task->wait_node.owner == NULL &&
             task->saved_stack_pointer != NULL && task->stack_low != NULL &&
             task->stack_high != NULL &&
             (uintptr_t)task->stack_low < (uintptr_t)task->stack_high &&
@@ -87,6 +99,47 @@ bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task)
             task->ready_node.next == NULL &&
             task->ready_node.object == NULL &&
             rts_delay_contains(&kernel->delay_queue, task);
+#if RTS_ENABLE_ASSERTIONS
+    valid = valid && task->validation_magic == RTS_TASK_VALIDATION_MAGIC;
+#endif
+    return valid;
+}
+
+bool rts_scheduler_task_is_blocked_wait(const rts_tcb_t *task)
+{
+    const rts_kernel_state_t *kernel = rts_kernel_state_get();
+    bool valid;
+
+    if (task == NULL || task == kernel->idle_task ||
+        !rts_task_handle_is_application_task((rts_task_handle_t)task))
+    {
+        return false;
+    }
+
+    valid = task->slot_state == RTS_TASK_SLOT_ALLOCATED &&
+            task->state == RTS_TASK_STATE_BLOCKED &&
+            (task->wait.reason == RTS_WAIT_SEMAPHORE ||
+             task->wait.reason == RTS_WAIT_MUTEX) &&
+            task->wait.result == RTS_WAIT_RESULT_NONE &&
+            task->wait.object != NULL && task->wait_node.owner != NULL &&
+            task->saved_stack_pointer != NULL && task->stack_low != NULL &&
+            task->stack_high != NULL &&
+            (uintptr_t)task->stack_low < (uintptr_t)task->stack_high &&
+            task->entry != NULL && task->priority > RTS_IDLE_PRIORITY &&
+            (size_t)task->priority < (size_t)RTS_PRIORITY_COUNT &&
+            !rts_ready_contains(&kernel->ready_set, task) &&
+            (task->wait.timeout_active ==
+             rts_delay_contains(&kernel->delay_queue, task));
+    if (valid && task->wait.reason == RTS_WAIT_SEMAPHORE)
+    {
+        valid = task->wait_node.owner ==
+                &((const rts_semaphore_t *)task->wait.object)->waiters;
+    }
+    else if (valid)
+    {
+        valid = task->wait_node.owner ==
+                &((const rts_mutex_t *)task->wait.object)->waiters;
+    }
 #if RTS_ENABLE_ASSERTIONS
     valid = valid && task->validation_magic == RTS_TASK_VALIDATION_MAGIC;
 #endif

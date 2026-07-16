@@ -30,6 +30,14 @@
 #error "RTS_ENABLE_ASSERTIONS must be defined by the selected rts_config.h"
 #endif
 
+#if !defined(RTS_MAX_MUTEXES_PER_TASK)
+#define RTS_MAX_MUTEXES_PER_TASK RTS_MAX_TASKS
+#endif
+
+#if (RTS_MAX_MUTEXES_PER_TASK < 1)
+#error "RTS_MAX_MUTEXES_PER_TASK must be at least 1"
+#endif
+
 #if (RTS_MAX_TASKS < 1)
 #error "RTS_MAX_TASKS must be at least 1"
 #endif
@@ -64,6 +72,9 @@ extern "C" {
 /** Largest relative delay accepted by rts_task_delay(). */
 #define RTS_DELAY_MAX               UINT32_C(0x7fffffff)
 
+/** Explicit infinite timeout value for blocking synchronization operations. */
+#define RTS_WAIT_FOREVER            UINT32_MAX
+
 /** Priority zero is reserved for the kernel idle task. */
 #define RTS_IDLE_PRIORITY           UINT8_C(0)
 
@@ -72,6 +83,7 @@ extern "C" {
     static _Alignas(RTS_TASK_STACK_ALIGNMENT) unsigned char name[(size_bytes)]
 
 typedef uint32_t rts_tick_t;
+typedef uint32_t rts_count_t;
 typedef uint8_t rts_priority_t;
 
 typedef enum
@@ -86,6 +98,8 @@ typedef enum
     RTS_STATUS_CAPACITY_EXHAUSTED,
     RTS_STATUS_ALREADY_INITIALIZED,
     RTS_STATUS_ALREADY_STARTED,
+    RTS_STATUS_TIMEOUT,
+    RTS_STATUS_FULL,
     RTS_STATUS_PORT_ERROR
 } rts_status_t;
 

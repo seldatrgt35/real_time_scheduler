@@ -184,6 +184,36 @@ static int scheduler_example(void)
 - [ ] Delay uses wrap-safe arithmetic and rejects values above `RTS_DELAY_MAX`.
 - [ ] Public ABI constants/types change only through an explicit compatibility review.
 
+## Sprint 8A synchronization amendment
+
+Sprint 8A adds `rts_count_t`, `RTS_WAIT_FOREVER`, `RTS_STATUS_TIMEOUT`,
+`RTS_STATUS_FULL`, `rts_semaphore_t`, and `rts_semaphore_init`,
+`rts_semaphore_take`, `rts_semaphore_give`, and
+`rts_semaphore_give_from_isr`. The semaphore is a caller-owned typed C11
+object, not opaque byte storage. It must be zero-initialized static storage
+before its one successful initialization and retain the same address
+thereafter. Its intentionally public layout contains counters, opaque task
+endpoints, bounded waiter count, and release validity metadata; it exposes
+neither a TCB definition nor intrusive links. Copying, moving, or modifying an
+initialized object is invalid; self identity makes copying detectable.
+
+`RTS_WAIT_FOREVER` is the single reserved infinite timeout. Finite semaphore
+waits use `0..RTS_DELAY_MAX`; other values are invalid. `TIMEOUT` represents
+both immediate unavailability and elapsed timeout. `FULL` represents give at
+maximum count. Maximum count one is the binary-semaphore model.
+
+Only `rts_semaphore_give_from_isr` is ISR-callable. It never blocks or transfers
+directly and returns the coalesced PendSV-notification decision. A
+scheduler-aware ISR must be maskable by PRIMASK and request PendSV at most once
+after aggregating its kernel operations. All preexisting APIs retain their
+task-context rules.
+
+Sprint 8B additionally adds the typed static `rts_mutex_t` and
+`rts_mutex_init`, `rts_mutex_lock`, and `rts_mutex_unlock`. Mutexes are
+non-recursive, task-owned, unavailable to ISR context, and use the same finite
+and forever timeout representation. Self-lock and non-owner unlock return
+`INVALID_STATE`; no extra public deadlock or ownership status is introduced.
+
 ## Approved Version 1 Public API Baseline
 
 The exact public types are `rts_status_t`, `rts_tick_t` (`uint32_t`), `rts_priority_t` (`uint8_t`), incomplete-pointer `rts_task_handle_t`, `rts_task_entry_t`, and `rts_task_config_t` containing only entry, argument, byte-counted stack pointer/size, and priority.

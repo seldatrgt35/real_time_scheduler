@@ -7,7 +7,9 @@
 #include "S32K148.h"
 #include "rts/rts.h"
 #include "rts/rts_task.h"
+#include "rts/rts_semaphore.h"
 #include "target.h"
+#include "target_tick.h"
 #include "time_internal.h"
 
 #define RTS_SMOKE_STACK_SIZE_BYTES 1024u
@@ -34,6 +36,32 @@ RTS_TASK_STACK_DECLARE(g_task_b_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_c_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 
 rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
+static rts_semaphore_t g_smoke_semaphore;
+static rts_mutex_t g_smoke_mutex;
+static bool g_low_mutex_locked;
+static rts_tick_t g_low_mutex_lock_tick;
+
+bool rts_s32k148_tick_isr_hook(void)
+{
+    static rts_tick_t last_give_tick;
+    rts_tick_t now = rts_kernel_tick_now();
+    bool higher_woken = false;
+
+    if ((rts_tick_t)(now - last_give_tick) < (rts_tick_t)20u)
+    {
+        return false;
+    }
+    last_give_tick = now;
+    if (rts_semaphore_give_from_isr(&g_smoke_semaphore, &higher_woken) !=
+        RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_SEMAPHORE;
+        return false;
+    }
+    ++g_rts_s32k148_smoke_record.semaphore_isr_give_count;
+    return higher_woken;
+}
 
 static const uint32_t g_task_a_patterns[8] = {
     UINT32_C(0xa4040404), UINT32_C(0xa5050505),
@@ -111,6 +139,7 @@ static void rts_smoke_task(void *argument)
 {
     rts_smoke_task_argument_t *task = (rts_smoke_task_argument_t *)argument;
     uint32_t expected_id;
+    bool high_mutex_exercised = false;
 
     if (task == &g_task_a_argument)
     {
@@ -158,6 +187,12 @@ static void rts_smoke_task(void *argument)
             RTS_SMOKE_FAILURE_HANDLER_STACK;
     }
 
+    if (task == &g_task_c_argument && rts_task_delay(10u) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_SEMAPHORE;
+    }
+
     for (;;)
     {
         ++(*task->counter);
@@ -174,6 +209,34 @@ static void rts_smoke_task(void *argument)
                 task->identifier;
         }
         g_rts_s32k148_smoke_record.observed_tick = rts_kernel_tick_now();
+        if (task == &g_task_b_argument && !g_low_mutex_locked)
+        {
+            if (rts_mutex_lock(&g_smoke_mutex, 0u) == RTS_STATUS_OK)
+            {
+                g_low_mutex_locked = true;
+                g_low_mutex_lock_tick = rts_kernel_tick_now();
+                ++g_rts_s32k148_smoke_record.mutex_low_lock_count;
+            }
+            else
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_SEMAPHORE;
+            }
+        }
+        if (task == &g_task_b_argument && g_low_mutex_locked &&
+            (rts_tick_t)(rts_kernel_tick_now() - g_low_mutex_lock_tick) >= 12u)
+        {
+            if (rts_mutex_unlock(&g_smoke_mutex) == RTS_STATUS_OK)
+            {
+                g_low_mutex_locked = false;
+                ++g_rts_s32k148_smoke_record.mutex_low_unlock_count;
+            }
+            else
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_SEMAPHORE;
+            }
+        }
         if (!rts_smoke_guard_is_valid(task->stack))
         {
             g_rts_s32k148_smoke_record.failure_flags |=
@@ -193,14 +256,53 @@ static void rts_smoke_task(void *argument)
                     RTS_SMOKE_FAILURE_YIELD;
             }
         }
-        if (task == &g_task_a_argument &&
-            rts_task_delay((rts_tick_t)10u) != RTS_STATUS_OK)
+        if (task == &g_task_a_argument)
         {
-            g_rts_s32k148_smoke_record.failure_flags |=
-                RTS_SMOKE_FAILURE_YIELD;
-        }
-        else if (task == &g_task_a_argument)
-        {
+            rts_status_t wait_status;
+
+            if (!high_mutex_exercised)
+            {
+                if (rts_task_delay(1u) != RTS_STATUS_OK ||
+                    rts_mutex_lock(&g_smoke_mutex, RTS_WAIT_FOREVER) !=
+                        RTS_STATUS_OK)
+                {
+                    g_rts_s32k148_smoke_record.failure_flags |=
+                        RTS_SMOKE_FAILURE_SEMAPHORE;
+                }
+                else
+                {
+                    ++g_rts_s32k148_smoke_record.mutex_high_handoff_count;
+                    if (rts_mutex_unlock(&g_smoke_mutex) != RTS_STATUS_OK)
+                    {
+                        g_rts_s32k148_smoke_record.failure_flags |=
+                            RTS_SMOKE_FAILURE_SEMAPHORE;
+                    }
+                }
+                high_mutex_exercised = true;
+            }
+
+            if ((g_rts_s32k148_smoke_record.task_a_wakeup_count & 1u) == 0u)
+            {
+                wait_status = rts_semaphore_take(&g_smoke_semaphore,
+                                                 RTS_WAIT_FOREVER);
+            }
+            else
+            {
+                wait_status = rts_semaphore_take(&g_smoke_semaphore, 3u);
+            }
+            if (wait_status == RTS_STATUS_OK)
+            {
+                ++g_rts_s32k148_smoke_record.semaphore_acquired_count;
+            }
+            else if (wait_status == RTS_STATUS_TIMEOUT)
+            {
+                ++g_rts_s32k148_smoke_record.semaphore_timeout_count;
+            }
+            else
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_SEMAPHORE;
+            }
             ++g_rts_s32k148_smoke_record.task_a_wakeup_count;
         }
     }
@@ -223,7 +325,7 @@ int main(void)
         .argument = &g_task_b_argument,
         .stack_buffer = g_task_b_stack,
         .stack_size_bytes = sizeof(g_task_b_stack),
-        .priority = 2u
+        .priority = 1u
     };
     const rts_task_config_t config_c = {
         .entry = rts_smoke_task,
@@ -236,6 +338,18 @@ int main(void)
     rts_smoke_guard_initialize(g_task_a_stack);
     rts_smoke_guard_initialize(g_task_b_stack);
     rts_smoke_guard_initialize(g_task_c_stack);
+    if (rts_semaphore_init(&g_smoke_semaphore, 0u, 1u) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_SEMAPHORE;
+        return 1;
+    }
+    if (rts_mutex_init(&g_smoke_mutex) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_SEMAPHORE;
+        return 1;
+    }
     if (rts_init() != RTS_STATUS_OK)
     {
         g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_INIT;

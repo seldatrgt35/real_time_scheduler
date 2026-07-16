@@ -4,7 +4,7 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. The portable kernel, Cortex-M4F startup/context-switch paths, scheduler tick, delayed blocking/wakeup preemption, tick-driven equal-priority time slicing, and an SDK-dependent S32K148 SysTick smoke image are implemented. Physical target validation is not yet complete. The project is not currently safety-certified or ready for production deployment.
+> **Project status:** Active development. Scheduling, delay/time slicing, static counting/binary semaphores with timeout and ISR-safe give, Cortex-M4F execution, and an SDK-dependent S32K148 smoke image are implemented. Physical target validation is not yet complete. The project is not currently safety-certified or ready for production deployment.
 
 ## Design goals
 
@@ -34,6 +34,8 @@ The repository currently includes:
 - public relative task delay, ordered wakeup, and higher-priority preemption;
 - a portable wrap-safe tick core and S32K148 SysTick source;
 - compile-time optional tick-driven equal-priority round robin;
+- statically owned counting/binary semaphores with deterministic priority/FIFO waiters;
+- finite/forever semaphore waits, direct handoff, timeout arbitration, and ISR-safe give;
 - the public scheduler-start transaction;
 - a deterministic host port and focused host tests;
 - a Cortex-M4F 64-byte initial task frame;
@@ -45,7 +47,7 @@ The following Version 1 work remains:
 - physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
-Synchronization primitives, runtime task creation, task deletion, EDF, rate-monotonic policy support, and floating-point context switching are intentionally outside the current baseline.
+Mutexes and priority inheritance, runtime task creation, task deletion, EDF, rate-monotonic policy support, and floating-point context switching remain outside the current baseline.
 
 ## Scheduling model
 
@@ -75,11 +77,25 @@ rts_status_t rts_task_create(
 
 rts_status_t rts_task_yield(void);
 rts_status_t rts_task_delay(rts_tick_t delay);
+
+rts_status_t rts_semaphore_init(rts_semaphore_t *semaphore,
+                                rts_count_t initial_count,
+                                rts_count_t maximum_count);
+rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
+                                rts_tick_t timeout);
+rts_status_t rts_semaphore_give(rts_semaphore_t *semaphore);
+rts_status_t rts_semaphore_give_from_isr(
+    rts_semaphore_t *semaphore,
+    bool *higher_priority_task_woken);
+
+rts_status_t rts_mutex_init(rts_mutex_t *mutex);
+rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout);
+rts_status_t rts_mutex_unlock(rts_mutex_t *mutex);
 ```
 
 Application tasks are registered only after `rts_init()` and before `rts_start()`. A successful embedded start transfers execution to the selected task and normally does not return.
 
-The public delay declaration and delay-queue mechanism are present, but the complete runtime delay path is not implemented yet.
+Semaphore objects are caller-owned, zero-initialized static objects. An initialized semaphore must remain at one stable address and must not be copied.
 
 ## Memory and ownership model
 
@@ -238,6 +254,7 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 3. Validate the S32K148 startup, linker, exception, and context-switch contracts on hardware.
 4. Run target-side ABI, interrupt, stack, and timing validation.
 5. Complete production-readiness and safety-analysis activities before deployment.
+6. Add mutex ownership and bounded priority inheritance in Sprint 8B.
 
 ## License
 

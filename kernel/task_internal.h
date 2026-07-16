@@ -29,14 +29,35 @@ typedef uint8_t rts_wait_reason_t;
 enum
 {
     RTS_WAIT_NONE = 0,
-    RTS_WAIT_DELAY
+    RTS_WAIT_DELAY,
+    RTS_WAIT_SEMAPHORE,
+    RTS_WAIT_MUTEX
+};
+
+typedef uint8_t rts_wait_result_t;
+enum
+{
+    RTS_WAIT_RESULT_NONE = 0,
+    RTS_WAIT_RESULT_ACQUIRED,
+    RTS_WAIT_RESULT_TIMEOUT,
+    RTS_WAIT_RESULT_CANCELLED
 };
 
 typedef struct
 {
     rts_wait_reason_t reason;
+    rts_wait_result_t result;
     rts_tick_t wake_tick;
+    void *object;
+    bool timeout_active;
 } rts_wait_t;
+
+typedef struct
+{
+    struct rts_task *previous;
+    struct rts_task *next;
+    void *owner;
+} rts_wait_node_t;
 
 struct rts_task
 {
@@ -50,9 +71,14 @@ struct rts_task
 
     rts_list_node_t ready_node;
     rts_list_node_t delay_node;
+    rts_wait_node_t wait_node;
     rts_wait_t wait;
     rts_tick_t slice_remaining;
 
+    struct rts_mutex *owned_mutex_head;
+    struct rts_mutex *owned_mutex_tail;
+    size_t owned_mutex_count;
+    rts_priority_t base_priority;
     rts_priority_t priority;
     rts_task_state_t state;
     rts_task_slot_state_t slot_state;

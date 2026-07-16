@@ -6,6 +6,8 @@
 #include "assert_internal.h"
 #include "port.h"
 #include "scheduler_internal.h"
+#include "semaphore_internal.h"
+#include "mutex_internal.h"
 
 rts_tick_t rts_kernel_tick_now(void)
 {
@@ -16,7 +18,9 @@ static bool rts_tick_expired_task_is_valid(const rts_kernel_state_t *kernel,
                                            const rts_tcb_t *task)
 {
     return task != NULL && task != kernel->idle_task &&
-           rts_scheduler_task_is_blocked_delay(task);
+           (rts_scheduler_task_is_blocked_delay(task) ||
+            (rts_scheduler_task_is_blocked_wait(task) &&
+             task->wait.timeout_active));
 }
 
 static bool rts_tick_wake_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
@@ -30,10 +34,22 @@ static bool rts_tick_wake_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
         return false;
     }
 
+    if (task->wait.reason == RTS_WAIT_SEMAPHORE)
+    {
+        return rts_semaphore_timeout_task(kernel, task);
+    }
+    if (task->wait.reason == RTS_WAIT_MUTEX)
+    {
+        return rts_mutex_timeout_task(kernel, task);
+    }
+
     rts_delay_remove(&kernel->delay_queue, task);
     RTS_FATAL_UNLESS(task->delay_node.owner == NULL);
     task->wait.reason = RTS_WAIT_NONE;
+    task->wait.result = RTS_WAIT_RESULT_NONE;
     task->wait.wake_tick = 0u;
+    task->wait.object = NULL;
+    task->wait.timeout_active = false;
     task->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     task->state = still_executing ? RTS_TASK_STATE_RUNNING
                                   : RTS_TASK_STATE_READY;
@@ -149,7 +165,8 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
 
     if (current->state == RTS_TASK_STATE_BLOCKED)
     {
-        RTS_FATAL_UNLESS(rts_scheduler_task_is_blocked_delay(current));
+        RTS_FATAL_UNLESS(rts_scheduler_task_is_blocked_delay(current) ||
+                         rts_scheduler_task_is_blocked_wait(current));
         return rts_scheduler_prepare_switch(selected);
     }
 
@@ -158,7 +175,8 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     if (current->state != RTS_TASK_STATE_RUNNING ||
         !rts_scheduler_current_is_valid() ||
         selected->priority < current->priority ||
-        (selected->priority == current->priority && !slice_rotated))
+        (selected->priority == current->priority && !slice_rotated &&
+         rts_ready_is_front(&kernel->ready_set, current)))
     {
         return false;
     }

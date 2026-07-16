@@ -17,7 +17,8 @@ enum
     RTS_SMOKE_FAILURE_STACK_GUARD = UINT32_C(1) << 7,
     RTS_SMOKE_FAILURE_HANDLER_STACK = UINT32_C(1) << 8,
     RTS_SMOKE_FAILURE_YIELD = UINT32_C(1) << 9,
-    RTS_SMOKE_FAILURE_CREATE_C = UINT32_C(1) << 10
+    RTS_SMOKE_FAILURE_CREATE_C = UINT32_C(1) << 10,
+    RTS_SMOKE_FAILURE_SEMAPHORE = UINT32_C(1) << 11
 };
 
 typedef struct
@@ -43,6 +44,12 @@ typedef struct
     volatile uint32_t last_low_priority_identifier;
     volatile uint32_t task_a_wakeup_count;
     volatile uint32_t time_slice_rotation_count;
+    volatile uint32_t semaphore_isr_give_count;
+    volatile uint32_t semaphore_acquired_count;
+    volatile uint32_t semaphore_timeout_count;
+    volatile uint32_t mutex_low_lock_count;
+    volatile uint32_t mutex_high_handoff_count;
+    volatile uint32_t mutex_low_unlock_count;
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;

@@ -40,9 +40,12 @@ bool rts_task_object_is_valid(const rts_tcb_t *task)
             task->stack_high != NULL &&
             (uintptr_t)task->stack_low < (uintptr_t)task->stack_high &&
             task->entry != NULL && task->priority > RTS_IDLE_PRIORITY &&
+            task->base_priority > RTS_IDLE_PRIORITY &&
+            task->priority >= task->base_priority &&
             (size_t)task->priority < (size_t)RTS_PRIORITY_COUNT &&
             task->wait.reason == RTS_WAIT_NONE &&
-            task->delay_node.owner == NULL;
+            task->wait.object == NULL && !task->wait.timeout_active &&
+            task->wait_node.owner == NULL && task->delay_node.owner == NULL;
 #if RTS_ENABLE_ASSERTIONS
     valid = valid && task->validation_magic == RTS_TASK_VALIDATION_MAGIC;
 #endif

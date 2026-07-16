@@ -47,6 +47,7 @@ rts_tcb_t *rts_scheduler_select_highest_ready(void);
 bool rts_scheduler_task_is_idle(const rts_tcb_t *task);
 bool rts_scheduler_task_is_runnable(const rts_tcb_t *task);
 bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task);
+bool rts_scheduler_task_is_blocked_wait(const rts_tcb_t *task);
 rts_tcb_t *rts_scheduler_current_get(void);
 bool rts_scheduler_current_is_valid(void);
 bool rts_scheduler_current_establish(rts_tcb_t *task);

@@ -16,6 +16,9 @@ static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
            rts_scheduler_current_is_valid() &&
            rts_ready_is_front(&kernel->ready_set, current) &&
            current->wait.reason == RTS_WAIT_NONE &&
+           current->wait.result == RTS_WAIT_RESULT_NONE &&
+           current->wait.object == NULL && !current->wait.timeout_active &&
+           current->wait_node.owner == NULL &&
            current->delay_node.owner == NULL &&
            !kernel->switch_plan.active;
 }
@@ -67,6 +70,9 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     RTS_FATAL_UNLESS(!rts_ready_contains(&kernel->ready_set, current));
 
     current->wait.reason = RTS_WAIT_DELAY;
+    current->wait.result = RTS_WAIT_RESULT_NONE;
+    current->wait.object = NULL;
+    current->wait.timeout_active = false;
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     current->state = RTS_TASK_STATE_BLOCKED;
     rts_delay_insert(&kernel->delay_queue, current);

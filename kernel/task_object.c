@@ -55,8 +55,13 @@ void rts_task_object_reset(rts_tcb_t *task)
     RTS_ASSERT(task->slot_state == RTS_TASK_SLOT_RESERVED);
     RTS_ASSERT(task->ready_node.owner == NULL);
     RTS_ASSERT(task->delay_node.owner == NULL);
+    RTS_ASSERT(task->wait_node.owner == NULL &&
+               task->wait_node.previous == NULL &&
+               task->wait_node.next == NULL);
     if (task->slot_state != RTS_TASK_SLOT_RESERVED ||
-        task->ready_node.owner != NULL || task->delay_node.owner != NULL)
+        task->ready_node.owner != NULL || task->delay_node.owner != NULL ||
+        task->wait_node.owner != NULL || task->wait_node.previous != NULL ||
+        task->wait_node.next != NULL)
     {
         return;
     }
@@ -68,9 +73,19 @@ void rts_task_object_reset(rts_tcb_t *task)
     task->argument = NULL;
     rts_list_node_initialize(&task->ready_node);
     rts_list_node_initialize(&task->delay_node);
+    task->wait_node.previous = NULL;
+    task->wait_node.next = NULL;
+    task->wait_node.owner = NULL;
     task->wait.reason = RTS_WAIT_NONE;
+    task->wait.result = RTS_WAIT_RESULT_NONE;
     task->wait.wake_tick = 0u;
+    task->wait.object = NULL;
+    task->wait.timeout_active = false;
     task->slice_remaining = 0u;
+    task->owned_mutex_head = NULL;
+    task->owned_mutex_tail = NULL;
+    task->owned_mutex_count = 0u;
+    task->base_priority = RTS_IDLE_PRIORITY;
     task->priority = RTS_IDLE_PRIORITY;
     task->state = RTS_TASK_STATE_DORMANT;
 #if RTS_ENABLE_ASSERTIONS
@@ -104,10 +119,16 @@ rts_status_t rts_task_object_initialize(const rts_task_pool_t *pool,
     RTS_ASSERT(task->slot_state == RTS_TASK_SLOT_RESERVED);
     RTS_ASSERT(rts_task_node_is_canonical_unlinked(&task->ready_node));
     RTS_ASSERT(rts_task_node_is_canonical_unlinked(&task->delay_node));
+    RTS_ASSERT(task->wait_node.owner == NULL &&
+               task->wait_node.previous == NULL &&
+               task->wait_node.next == NULL);
     contract_is_valid = lifecycle == RTS_KERNEL_INITIALIZED &&
                         task->slot_state == RTS_TASK_SLOT_RESERVED &&
                         rts_task_node_is_canonical_unlinked(&task->ready_node) &&
-                        rts_task_node_is_canonical_unlinked(&task->delay_node);
+                        rts_task_node_is_canonical_unlinked(&task->delay_node) &&
+                        task->wait_node.owner == NULL &&
+                        task->wait_node.previous == NULL &&
+                        task->wait_node.next == NULL;
     if (!contract_is_valid)
     {
         return RTS_STATUS_INVALID_STATE;
@@ -128,10 +149,20 @@ rts_status_t rts_task_object_initialize(const rts_task_pool_t *pool,
 
     rts_list_node_initialize(&task->ready_node);
     rts_list_node_initialize(&task->delay_node);
+    task->wait_node.previous = NULL;
+    task->wait_node.next = NULL;
+    task->wait_node.owner = NULL;
 
     task->wait.reason = RTS_WAIT_NONE;
+    task->wait.result = RTS_WAIT_RESULT_NONE;
     task->wait.wake_tick = 0u;
+    task->wait.object = NULL;
+    task->wait.timeout_active = false;
     task->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+    task->owned_mutex_head = NULL;
+    task->owned_mutex_tail = NULL;
+    task->owned_mutex_count = 0u;
+    task->base_priority = config->priority;
     task->priority = config->priority;
     task->state = RTS_TASK_STATE_DORMANT;
 

@@ -23,7 +23,8 @@ static bool rts_switch_outgoing_is_valid(const rts_kernel_state_t *kernel,
            ((task->state == RTS_TASK_STATE_RUNNING &&
              rts_scheduler_task_is_runnable(task)) ||
             (task->state == RTS_TASK_STATE_BLOCKED &&
-             rts_scheduler_task_is_blocked_delay(task)));
+             (rts_scheduler_task_is_blocked_delay(task) ||
+              rts_scheduler_task_is_blocked_wait(task))));
 }
 
 bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)

@@ -30,6 +30,10 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/switch_plan.c
     ${PROJECT_SOURCE_DIR}/kernel/task_yield.c
     ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+    ${PROJECT_SOURCE_DIR}/kernel/wait_object.c
+    ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
+    ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
+    ${PROJECT_SOURCE_DIR}/kernel/mutex.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
     ${PROJECT_SOURCE_DIR}/kernel/time.c
 )

@@ -133,6 +133,11 @@ uint32_t rts_s32k148_tick_reload_get(void)
     return rts_s32k148_tick_reload;
 }
 
+__attribute__((weak)) bool rts_s32k148_tick_isr_hook(void)
+{
+    return false;
+}
+
 void SysTick_Handler(void)
 {
     bool valid = rts_s32k148_tick_state == RTS_S32K148_TICK_RUNNING;
@@ -141,6 +146,7 @@ void SysTick_Handler(void)
     RTS_FATAL_UNLESS(valid);
     (void)SysTick->CTRL;
     notify_port = rts_kernel_tick_advance(UINT32_C(1));
+    notify_port = rts_s32k148_tick_isr_hook() || notify_port;
     if (notify_port)
     {
         rts_port_request_context_switch();

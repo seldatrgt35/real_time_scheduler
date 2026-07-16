@@ -2,10 +2,26 @@
 #include <stdint.h>
 
 #include "scheduler_internal.h"
+#include "semaphore_internal.h"
 #include "time_internal.h"
 
 static int test_failures;
 static unsigned int assertion_count;
+
+bool rts_semaphore_timeout_task(rts_kernel_state_t *kernel,
+                                rts_tcb_t *task)
+{
+    (void)kernel;
+    (void)task;
+    return false;
+}
+
+bool rts_mutex_timeout_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
+{
+    (void)kernel;
+    (void)task;
+    return false;
+}
 static bool test_in_isr;
 static unsigned int switch_request_count;
 static rts_kernel_state_t test_kernel;

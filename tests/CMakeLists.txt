@@ -522,6 +522,10 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_select.c
     ${PROJECT_SOURCE_DIR}/kernel/switch_plan.c
     ${PROJECT_SOURCE_DIR}/kernel/task_yield.c
+    ${PROJECT_SOURCE_DIR}/kernel/wait_object.c
+    ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
+    ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
+    ${PROJECT_SOURCE_DIR}/kernel/mutex.c
     ${PROJECT_SOURCE_DIR}/ports/host/port.c
 )
 
@@ -725,3 +729,61 @@ rts_add_time_slicing_test(rts_test_time_slicing_release
                           tests/config_release)
 rts_add_time_slicing_test(rts_test_time_slicing_disabled
                           tests/config_no_slicing)
+
+function(rts_add_semaphore_test target config_directory)
+    add_executable(${target}
+        unit/test_semaphore.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_semaphore_test(rts_test_semaphore tests/config)
+rts_add_semaphore_test(rts_test_semaphore_release tests/config_release)
+rts_add_semaphore_test(rts_test_semaphore_no_slicing tests/config_no_slicing)
+
+function(rts_add_mutex_test target config_directory)
+    add_executable(${target}
+        unit/test_mutex.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_mutex_test(rts_test_mutex tests/config)
+rts_add_mutex_test(rts_test_mutex_release tests/config_release)
+rts_add_mutex_test(rts_test_mutex_no_slicing tests/config_no_slicing)
