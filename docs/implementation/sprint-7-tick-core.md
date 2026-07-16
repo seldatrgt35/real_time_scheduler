@@ -49,7 +49,10 @@ calls are invalid. `rts_kernel_tick_now()` returns the value by copy.
 
 ## Selected S32K148 source
 
-Version 1 uses Cortex-M SysTick, not LPIT/PIT. SysTick is part of the Cortex-M4F
+For normal periodic execution, Version 1 uses Cortex-M SysTick, not LPIT/PIT.
+Sprint 11 supersedes the earlier implication that no peripheral wake timer is
+used: tickless idle temporarily suppresses SysTick and uses S32K148 LPTMR0 as
+the bounded one-shot wake source. SysTick is part of the Cortex-M4F
 core, already represented in CMSIS and in the core vector table, needs no PCC or
 peripheral driver, and is sufficient for the initial periodic scheduler clock.
 There is exactly one strong `SysTick_Handler` in the target image.

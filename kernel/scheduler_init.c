@@ -4,15 +4,24 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "power_internal.h"
 #include "scheduler_internal.h"
 #include "stack_check_internal.h"
 #include "timer_internal.h"
+
+/* Focused bootstrap builds do not link the optional power subsystem. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((weak)) void rts_power_idle(void)
+{
+}
+#endif
 
 static void rts_idle_entry(void *argument)
 {
     (void)argument;
     for (;;)
     {
+        rts_power_idle();
     }
 }
 

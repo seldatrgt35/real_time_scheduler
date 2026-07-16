@@ -98,6 +98,34 @@ struct rts_timer *rts_timer_queue_peek_expired(
                : NULL;
 }
 
+bool rts_timer_queue_next_deadline(const rts_timer_queue_t *queue,
+                                   rts_tick_t *out_deadline)
+{
+    const rts_list_node_t *head;
+    const struct rts_timer *timer;
+
+    if (queue == NULL || out_deadline == NULL)
+    {
+        RTS_ASSERT(queue != NULL && out_deadline != NULL);
+        return false;
+    }
+    head = queue->ordered_timers.head;
+    if (head == NULL)
+    {
+        RTS_ASSERT(queue->ordered_timers.count == 0u);
+        return false;
+    }
+    timer = head->object;
+    if (head->owner != &queue->ordered_timers || timer == NULL ||
+        &timer->queue_node != head)
+    {
+        RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, head);
+        return false;
+    }
+    *out_deadline = timer->expiration_tick;
+    return true;
+}
+
 bool rts_timer_queue_contains(const rts_timer_queue_t *queue,
                               const struct rts_timer *timer)
 {

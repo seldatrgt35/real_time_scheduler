@@ -67,6 +67,7 @@ void rts_scheduler_timer_service_cancel_wake(void);
 
 rts_tick_t rts_kernel_tick_now(void);
 bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks);
+bool rts_kernel_time_skip(rts_tick_t elapsed_ticks);
 bool rts_scheduler_prepare_switch(rts_tcb_t *next_task);
 void rts_scheduler_request_switch_if_needed(rts_tcb_t *next_task);
 bool rts_scheduler_switch_acquire(rts_switch_snapshot_t *snapshot);

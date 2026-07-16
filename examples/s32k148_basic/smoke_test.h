@@ -70,6 +70,9 @@ typedef struct
     volatile uint32_t timer_callback_ipsr;
     volatile uint32_t timer_service_identity_valid;
     volatile uint32_t timer_stop_restart_count;
+    volatile uint32_t tickless_before_sleep_count;
+    volatile uint32_t tickless_after_sleep_count;
+    volatile uint32_t tickless_elapsed_ticks;
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;

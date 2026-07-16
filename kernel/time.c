@@ -109,7 +109,7 @@ static bool rts_tick_account_current_slice(rts_kernel_state_t *kernel,
 #endif
 }
 
-bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
+static bool rts_kernel_time_advance_common(rts_tick_t elapsed_ticks)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_tcb_t *expired;
@@ -118,16 +118,6 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     bool woke_task = false;
     bool current_woke = false;
     bool slice_rotated;
-    bool valid = kernel->lifecycle == RTS_KERNEL_RUNNING &&
-                 rts_port_is_in_isr() && elapsed_ticks != 0u &&
-                 elapsed_ticks <= RTS_TICK_MAX_ADVANCE;
-
-    RTS_ASSERT(valid);
-    if (!valid)
-    {
-        return false;
-    }
-
     kernel->current_tick += elapsed_ticks;
 #if RTS_ENABLE_RUNTIME_STATS
     kernel->runtime_counters.scheduler_ticks =
@@ -201,4 +191,26 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     }
 
     return rts_scheduler_prepare_switch(selected);
+}
+
+bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    bool valid = kernel->lifecycle == RTS_KERNEL_RUNNING &&
+                 rts_port_is_in_isr() && elapsed_ticks != 0u &&
+                 elapsed_ticks <= RTS_TICK_MAX_ADVANCE;
+
+    RTS_ASSERT(valid);
+    return valid ? rts_kernel_time_advance_common(elapsed_ticks) : false;
+}
+
+bool rts_kernel_time_skip(rts_tick_t elapsed_ticks)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    bool valid = kernel->lifecycle == RTS_KERNEL_RUNNING &&
+                 !rts_port_is_in_isr() && elapsed_ticks != 0u &&
+                 elapsed_ticks <= RTS_TICK_MAX_ADVANCE;
+
+    RTS_ASSERT(valid);
+    return valid ? rts_kernel_time_advance_common(elapsed_ticks) : false;
 }

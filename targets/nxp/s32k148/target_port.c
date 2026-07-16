@@ -9,6 +9,7 @@
 #include "target_config.h"
 #include "target_diagnostics.h"
 #include "target_tick.h"
+#include "target_power.h"
 
 extern void (*const g_pfnVectors[])(void);
 
@@ -95,6 +96,7 @@ rts_status_t rts_port_initialize(void)
         g_pfnVectors[11] != SVC_Handler ||
         g_pfnVectors[14] != PendSV_Handler ||
         g_pfnVectors[15] != SysTick_Handler ||
+        g_pfnVectors[16u + (uint32_t)LPTMR0_IRQn] != LPTMR0_IRQHandler ||
         start_handoff->valid != 0u || kernel->switch_plan.pending ||
         kernel->switch_plan.active)
     {
@@ -120,6 +122,10 @@ rts_status_t rts_port_initialize(void)
     }
     if (rts_s32k148_tick_initialize(RTS_S32K148_CORE_CLOCK_HZ,
                                     RTS_TICK_RATE_HZ) != RTS_STATUS_OK)
+    {
+        return RTS_STATUS_PORT_ERROR;
+    }
+    if (rts_s32k148_power_initialize() != RTS_STATUS_OK)
     {
         return RTS_STATUS_PORT_ERROR;
     }

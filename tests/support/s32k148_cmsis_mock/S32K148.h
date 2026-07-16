@@ -18,6 +18,18 @@
 #define FPU_FPCCR_ASPEN_Msk        (UINT32_C(1) << 31)
 #define CoreDebug_DEMCR_TRCENA_Msk (UINT32_C(1) << 24)
 #define DWT_CTRL_CYCCNTENA_Msk     (UINT32_C(1) << 0)
+#define PCC_PCCn_CGC_MASK          (UINT32_C(1) << 30)
+#define PCC_LPTMR0_INDEX           64u
+#define LPTMR_PSR_PCS(value)       ((uint32_t)(value))
+#define LPTMR_PSR_PBYP_MASK        (UINT32_C(1) << 2)
+#define LPTMR_CSR_TEN_MASK         (UINT32_C(1) << 0)
+#define LPTMR_CSR_TCF_MASK         (UINT32_C(1) << 7)
+#define LPTMR_CSR_TIE_MASK         (UINT32_C(1) << 6)
+
+typedef enum
+{
+    LPTMR0_IRQn = 58
+} IRQn_Type;
 
 typedef struct
 {
@@ -50,11 +62,30 @@ typedef struct
     volatile uint32_t DEMCR;
 } CoreDebug_Type;
 
+typedef struct
+{
+    volatile uint32_t CSR;
+    volatile uint32_t PSR;
+    volatile uint32_t CMR;
+    volatile uint32_t CNR;
+} LPTMR_Type;
+
+typedef struct
+{
+    volatile uint32_t PCCn[128];
+} PCC_Type;
+
 extern SysTick_Type rts_test_systick;
 extern SCB_Type rts_test_scb;
 extern FPU_Type rts_test_fpu;
 extern DWT_Type rts_test_dwt;
 extern CoreDebug_Type rts_test_core_debug;
+extern LPTMR_Type rts_test_lptmr0;
+extern PCC_Type rts_test_pcc;
+extern uint32_t rts_test_nvic_enabled[8];
+extern uint32_t rts_test_nvic_priority[256];
+extern unsigned int rts_test_wfi_count;
+extern void (*rts_test_wfi_hook)(void);
 extern uint32_t rts_test_primask;
 extern uint32_t rts_test_ipsr;
 extern uint32_t rts_test_psp;
@@ -68,6 +99,24 @@ extern unsigned int rts_test_isb_count;
 #define FPU (&rts_test_fpu)
 #define DWT (&rts_test_dwt)
 #define CoreDebug (&rts_test_core_debug)
+#define LPTMR0 (&rts_test_lptmr0)
+#define PCC (&rts_test_pcc)
+
+static inline void NVIC_ClearPendingIRQ(IRQn_Type irqn)
+{
+    (void)irqn;
+}
+
+static inline void NVIC_SetPriority(IRQn_Type irqn, uint32_t priority)
+{
+    rts_test_nvic_priority[(uint32_t)irqn] = priority;
+}
+
+static inline void NVIC_EnableIRQ(IRQn_Type irqn)
+{
+    rts_test_nvic_enabled[(uint32_t)irqn / 32u] |=
+        UINT32_C(1) << ((uint32_t)irqn % 32u);
+}
 
 static inline uint32_t __get_PRIMASK(void)
 {
@@ -117,6 +166,15 @@ static inline void __enable_irq(void)
 static inline void __set_PRIMASK(uint32_t value)
 {
     rts_test_primask = value & 1u;
+}
+
+static inline void __WFI(void)
+{
+    ++rts_test_wfi_count;
+    if (rts_test_wfi_hook != 0)
+    {
+        rts_test_wfi_hook();
+    }
 }
 
 #endif /* RTS_TEST_S32K148_CMSIS_MOCK_H */

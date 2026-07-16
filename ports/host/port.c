@@ -26,6 +26,12 @@ static size_t rts_host_critical_depth;
 static size_t rts_host_switch_request_count;
 static size_t rts_host_last_switch_request_critical_depth;
 static bool rts_host_switch_request_pending;
+static bool rts_host_sleep_wake_configured;
+static bool rts_host_fail_next_sleep;
+static rts_tick_t rts_host_next_sleep_elapsed;
+static rts_tick_t rts_host_last_sleep_limit;
+static rts_port_wake_source_t rts_host_next_wake_source;
+static size_t rts_host_sleep_count;
 static rts_critical_token_t
     rts_host_critical_tokens[RTS_HOST_CRITICAL_NESTING_MAX];
 
@@ -244,6 +250,45 @@ void rts_port_tick_stop(void)
     rts_host_tick_running = false;
 }
 
+rts_port_sleep_result_t rts_port_power_sleep(rts_tick_t maximum_ticks)
+{
+    rts_port_sleep_result_t result = {
+        .status = RTS_STATUS_PORT_ERROR,
+        .elapsed_ticks = 0u,
+        .wake_source = RTS_PORT_WAKE_OTHER
+    };
+
+    RTS_ASSERT(maximum_ticks != 0u);
+    RTS_ASSERT(rts_host_tick_running);
+    RTS_ASSERT(rts_host_critical_depth > 0u);
+    if (maximum_ticks == 0u || !rts_host_tick_running ||
+        rts_host_critical_depth == 0u)
+    {
+        return result;
+    }
+    rts_host_last_sleep_limit = maximum_ticks;
+    if (rts_host_fail_next_sleep)
+    {
+        rts_host_fail_next_sleep = false;
+        return result;
+    }
+
+    result.elapsed_ticks = rts_host_sleep_wake_configured
+                               ? rts_host_next_sleep_elapsed
+                               : maximum_ticks;
+    result.wake_source = rts_host_sleep_wake_configured
+                             ? rts_host_next_wake_source
+                             : RTS_PORT_WAKE_TIMER;
+    rts_host_sleep_wake_configured = false;
+    if (result.elapsed_ticks > maximum_ticks)
+    {
+        return result;
+    }
+    result.status = RTS_STATUS_OK;
+    ++rts_host_sleep_count;
+    return result;
+}
+
 bool rts_host_port_initial_frame_read(const void *saved_stack_pointer,
                                       rts_host_initial_frame_t *out_frame)
 {
@@ -286,6 +331,12 @@ void rts_host_port_test_reset(void)
     rts_host_switch_request_count = 0u;
     rts_host_last_switch_request_critical_depth = 0u;
     rts_host_switch_request_pending = false;
+    rts_host_sleep_wake_configured = false;
+    rts_host_fail_next_sleep = false;
+    rts_host_next_sleep_elapsed = 0u;
+    rts_host_last_sleep_limit = 0u;
+    rts_host_next_wake_source = RTS_PORT_WAKE_TIMER;
+    rts_host_sleep_count = 0u;
     for (index = 0u; index < RTS_HOST_CRITICAL_NESTING_MAX; ++index)
     {
         rts_host_critical_tokens[index] = 0u;
@@ -345,4 +396,27 @@ bool rts_host_port_test_switch_request_pending(void)
 void rts_host_port_test_consume_switch_request(void)
 {
     rts_host_switch_request_pending = false;
+}
+
+void rts_host_port_test_set_next_wake(rts_tick_t elapsed_ticks,
+                                      rts_port_wake_source_t source)
+{
+    rts_host_sleep_wake_configured = true;
+    rts_host_next_sleep_elapsed = elapsed_ticks;
+    rts_host_next_wake_source = source;
+}
+
+void rts_host_port_test_fail_next_sleep(bool fail)
+{
+    rts_host_fail_next_sleep = fail;
+}
+
+size_t rts_host_port_test_sleep_count(void)
+{
+    return rts_host_sleep_count;
+}
+
+rts_tick_t rts_host_port_test_last_sleep_limit(void)
+{
+    return rts_host_last_sleep_limit;
 }

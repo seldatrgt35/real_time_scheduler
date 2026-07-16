@@ -206,6 +206,28 @@ bool rts_ready_is_front(const rts_ready_set_t *ready_set,
     return queue->head == &task->ready_node;
 }
 
+bool rts_ready_only_contains(const rts_ready_set_t *ready_set,
+                             const rts_tcb_t *task)
+{
+    size_t priority;
+
+    if (ready_set == NULL || task == NULL ||
+        !rts_ready_contains(ready_set, task))
+    {
+        return false;
+    }
+    for (priority = 0u; priority < (size_t)RTS_PRIORITY_COUNT; ++priority)
+    {
+        const size_t expected = priority == (size_t)task->priority ? 1u : 0u;
+
+        if (ready_set->priority_queue[priority].count != expected)
+        {
+            return false;
+        }
+    }
+    return rts_ready_peek_highest(ready_set) == task;
+}
+
 void rts_ready_rotate(rts_ready_set_t *ready_set,
                       rts_priority_t priority)
 {

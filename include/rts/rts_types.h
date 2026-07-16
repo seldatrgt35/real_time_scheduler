@@ -28,6 +28,11 @@
 #error "RTS_TICK_RATE_HZ must be defined by the selected rts_config.h"
 #endif
 
+#if !defined(RTS_ENABLE_TICKLESS_IDLE) ||                              \
+    !defined(RTS_TICKLESS_MAX_SLEEP_TICKS)
+#error "all Sprint 11 tickless-idle options must be selected"
+#endif
+
 #if !defined(RTS_ENABLE_TIME_SLICING)
 #error "RTS_ENABLE_TIME_SLICING must be defined by the selected rts_config.h"
 #endif
@@ -84,6 +89,15 @@
 
 #if (RTS_TICK_RATE_HZ < 1)
 #error "RTS_TICK_RATE_HZ must be nonzero"
+#endif
+
+#if (RTS_ENABLE_TICKLESS_IDLE != 0) && (RTS_ENABLE_TICKLESS_IDLE != 1)
+#error "RTS_ENABLE_TICKLESS_IDLE must be 0 or 1"
+#endif
+
+#if (RTS_TICKLESS_MAX_SLEEP_TICKS < 1) ||                         \
+    (RTS_TICKLESS_MAX_SLEEP_TICKS > UINT32_C(0x7fffffff))
+#error "RTS_TICKLESS_MAX_SLEEP_TICKS must be in the wrap-safe half range"
 #endif
 
 #if (RTS_ENABLE_TIME_SLICING != 0) && (RTS_ENABLE_TIME_SLICING != 1)

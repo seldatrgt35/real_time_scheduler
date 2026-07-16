@@ -70,9 +70,18 @@ bool rts_diagnostics_snapshot_read(rts_diagnostics_snapshot_t *snapshot)
     }
     total_ticks = kernel->runtime_counters.scheduler_ticks;
     snapshot->context_switches = kernel->runtime_counters.context_switches;
+    snapshot->tickless_sleep_entries =
+        kernel->runtime_counters.tickless_sleep_entries;
+    snapshot->tickless_suppressed_ticks =
+        kernel->runtime_counters.tickless_suppressed_ticks;
+    snapshot->tickless_longest_sleep =
+        kernel->runtime_counters.tickless_longest_sleep;
 #else
     total_ticks = kernel->current_tick;
     snapshot->context_switches = 0u;
+    snapshot->tickless_sleep_entries = 0u;
+    snapshot->tickless_suppressed_ticks = 0u;
+    snapshot->tickless_longest_sleep = 0u;
 #endif
     if (idle_ticks > total_ticks)
     {

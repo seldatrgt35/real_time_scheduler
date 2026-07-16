@@ -157,6 +157,28 @@ rts_tcb_t *rts_delay_peek_expired(const rts_delay_queue_t *delay_queue,
     return task;
 }
 
+bool rts_delay_next_deadline(const rts_delay_queue_t *delay_queue,
+                             rts_tick_t *out_deadline)
+{
+    const rts_list_node_t *head;
+    const rts_tcb_t *task;
+
+    RTS_DELAY_REQUIRE_FALSE(delay_queue != NULL);
+    RTS_DELAY_REQUIRE_FALSE(out_deadline != NULL);
+    head = delay_queue->ordered_tasks.head;
+    if (head == NULL)
+    {
+        RTS_DELAY_REQUIRE_FALSE(delay_queue->ordered_tasks.count == 0u);
+        return false;
+    }
+    RTS_DELAY_REQUIRE_FALSE(head->owner == &delay_queue->ordered_tasks);
+    RTS_DELAY_REQUIRE_FALSE(head->object != NULL);
+    task = head->object;
+    RTS_DELAY_REQUIRE_FALSE(&task->delay_node == head);
+    *out_deadline = task->wait.wake_tick;
+    return true;
+}
+
 bool rts_delay_contains(const rts_delay_queue_t *delay_queue,
                         const rts_tcb_t *task)
 {

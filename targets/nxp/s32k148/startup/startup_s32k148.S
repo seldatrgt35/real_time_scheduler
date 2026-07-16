@@ -5,6 +5,7 @@
     .extern SVC_Handler
     .extern PendSV_Handler
     .extern SysTick_Handler
+    .extern LPTMR0_IRQHandler
     .extern rts_s32k148_reset_entry
 
     .section .isr_vector, "a", %progbits
@@ -28,7 +29,12 @@ g_pfnVectors:
     .word 0
     .word PendSV_Handler
     .word SysTick_Handler
-    .rept 240
+    /* External IRQ 58 is LPTMR0 on S32K148. */
+    .rept 58
+    .word Default_Handler
+    .endr
+    .word LPTMR0_IRQHandler
+    .rept 181
     .word Default_Handler
     .endr
     .size g_pfnVectors, .-g_pfnVectors

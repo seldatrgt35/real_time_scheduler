@@ -37,5 +37,6 @@ static inline bool rts_tick_relative_is_valid(rts_tick_t relative_ticks)
 
 rts_tick_t rts_kernel_tick_now(void);
 bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks);
+bool rts_kernel_time_skip(rts_tick_t elapsed_ticks);
 
 #endif /* RTS_TIME_INTERNAL_H */

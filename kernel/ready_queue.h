@@ -26,6 +26,8 @@ bool rts_ready_contains(const rts_ready_set_t *ready_set,
                         const rts_tcb_t *task);
 bool rts_ready_is_front(const rts_ready_set_t *ready_set,
                         const rts_tcb_t *task);
+bool rts_ready_only_contains(const rts_ready_set_t *ready_set,
+                             const rts_tcb_t *task);
 void rts_ready_rotate(rts_ready_set_t *ready_set,
                       rts_priority_t priority);
 

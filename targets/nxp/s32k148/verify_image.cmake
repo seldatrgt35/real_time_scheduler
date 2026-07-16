@@ -13,6 +13,7 @@ file(READ "${SYMBOL_FILE}" symbols)
 file(READ "${DISASSEMBLY_FILE}" disassembly)
 
 foreach(required Reset_Handler SVC_Handler PendSV_Handler SysTick_Handler
+                 LPTMR0_IRQHandler rts_port_power_sleep
                  HardFault_Handler
                  rts_kernel_tick_advance
                  rts_kernel_fatal_at g_rts_fatal_record

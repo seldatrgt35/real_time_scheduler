@@ -35,6 +35,13 @@ typedef struct
     uint32_t timer_overruns;
     uint32_t timer_callback_queue_maximum_depth;
     uint32_t timer_callback_queue_overflows;
+    uint32_t tickless_sleep_attempts;
+    uint32_t tickless_sleep_entries;
+    uint32_t tickless_sleep_aborts;
+    uint32_t tickless_timer_wakes;
+    uint32_t tickless_external_wakes;
+    uint32_t tickless_suppressed_ticks;
+    uint32_t tickless_longest_sleep;
 } rts_runtime_counters_t;
 
 typedef struct
@@ -44,6 +51,9 @@ typedef struct
     uint32_t task_count;
     uint32_t idle_ticks;
     uint32_t non_idle_ticks;
+    uint32_t tickless_sleep_entries;
+    uint32_t tickless_suppressed_ticks;
+    uint32_t tickless_longest_sleep;
     uint32_t fatal_reason;
 } rts_diagnostics_snapshot_t;
 

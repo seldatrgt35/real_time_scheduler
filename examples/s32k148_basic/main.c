@@ -17,6 +17,7 @@
 #include "invariant_check_internal.h"
 #include "stack_check_internal.h"
 #include "scheduler_internal.h"
+#include "power_internal.h"
 
 #define RTS_SMOKE_STACK_SIZE_BYTES 1024u
 #define RTS_SMOKE_GUARD_SIZE_BYTES 32u
@@ -49,6 +50,20 @@ static bool g_low_mutex_locked;
 static rts_tick_t g_low_mutex_lock_tick;
 static rts_timer_handle_t g_periodic_timer;
 static rts_timer_handle_t g_one_shot_timer;
+
+void rts_power_before_sleep(rts_tick_t planned_ticks)
+{
+    (void)planned_ticks;
+    ++g_rts_s32k148_smoke_record.tickless_before_sleep_count;
+}
+
+void rts_power_after_sleep(rts_tick_t elapsed_ticks,
+                           rts_port_wake_source_t source)
+{
+    (void)source;
+    ++g_rts_s32k148_smoke_record.tickless_after_sleep_count;
+    g_rts_s32k148_smoke_record.tickless_elapsed_ticks += elapsed_ticks;
+}
 
 static void rts_smoke_timer_context_record(void)
 {
@@ -415,6 +430,12 @@ static void rts_smoke_task(void *argument)
                     RTS_SMOKE_FAILURE_SEMAPHORE;
             }
             ++g_rts_s32k148_smoke_record.task_a_wakeup_count;
+        }
+        else if (rts_task_delay(task == &g_task_b_argument ? 3u : 2u) !=
+                 RTS_STATUS_OK)
+        {
+            g_rts_s32k148_smoke_record.failure_flags |=
+                RTS_SMOKE_FAILURE_YIELD;
         }
     }
 }

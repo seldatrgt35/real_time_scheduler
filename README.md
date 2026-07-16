@@ -4,7 +4,7 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. Scheduling, delay/time slicing, semaphores, mutexes with bounded priority inheritance, and compile-time kernel diagnostics are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
+> **Project status:** Active development. Scheduling, delay/time slicing, synchronization, software timers, diagnostics, and tickless idle are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
 
 ## Design goals
 
@@ -43,6 +43,9 @@ The repository currently includes:
   snapshots, a fixed trace ring, and bounded global invariant validation;
 - statically pooled one-shot and periodic software timers with a dedicated
   active queue, bounded callback FIFO, and private deferred service task;
+- a portable tickless-idle power manager with wrap-safe earliest-wake
+  calculation, coalesced time compensation, optional hooks, and diagnostics;
+- deterministic host sleep simulation and an S32K148 LPTMR0/WFI target path;
 - deterministic 20,000-event diagnostics stress tests in enabled, release, and
   no-time-slicing configurations;
 - the public scheduler-start transaction;
@@ -270,6 +273,7 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Sprint 10A timer infrastructure](docs/implementation/sprint-10a-timer-infrastructure.md)
 - [Sprint 10B callback service](docs/implementation/sprint-10b-timer-callback-service.md)
 - [Sprint 10 acceptance review](docs/architecture/sprint-10-acceptance-review.md)
+- [Sprint 11 tickless idle and power architecture](docs/implementation/sprint-11-tickless-idle.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -287,7 +291,7 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 
 1. Run the long-duration S32K148 smoke and deliberate fault-capture image.
 2. Measure target stack margins, context-switch latency, and critical windows.
-3. Design Tickless Idle and Power Management using ordered delay/timer heads.
+3. Extend scheduling policy contracts for the planned Sprint 12 EDF/RMS work.
 4. Complete production-readiness and safety-analysis activities before deployment.
 
 ## License

@@ -45,12 +45,14 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/invariant_check.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
     ${PROJECT_SOURCE_DIR}/kernel/time.c
+    ${PROJECT_SOURCE_DIR}/kernel/power.c
 )
 
 add_library(rts_target_s32k148 STATIC
     target.c
     target_diagnostics.c
     target_port.c
+    target_power.c
     target_runtime.c
     target_tick.c
     target_tick_math.c
