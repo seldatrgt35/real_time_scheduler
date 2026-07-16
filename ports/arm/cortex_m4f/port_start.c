@@ -45,6 +45,10 @@ void *rts_cm4f_start_handoff_consume(void)
     }
 
     rts_cm4f_start_handoff.valid = UINT32_C(0);
+    if (!rts_port_tick_commit_start())
+    {
+        return NULL;
+    }
     return saved_stack_pointer;
 }
 

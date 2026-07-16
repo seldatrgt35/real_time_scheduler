@@ -4,7 +4,7 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. The portable kernel foundations and the Cortex-M4F startup/context-switch paths are implemented and host-tested. Tick processing, runtime delay orchestration, and S32K148 board integration are not yet complete. The project is not currently safety-certified or ready for production deployment.
+> **Project status:** Active development. The portable kernel, Cortex-M4F startup/context-switch paths, scheduler tick, delayed blocking/wakeup preemption, and an SDK-dependent S32K148 SysTick smoke image are implemented. Physical target validation and tick-driven time slicing are not yet complete. The project is not currently safety-certified or ready for production deployment.
 
 ## Design goals
 
@@ -31,6 +31,8 @@ The repository currently includes:
 - kernel bootstrap and idle-task registration;
 - highest-ready selection and scheduler-owned `current_task` management;
 - immutable switch planning and public task-yield integration;
+- public relative task delay, ordered wakeup, and higher-priority preemption;
+- a portable wrap-safe tick core and S32K148 SysTick source;
 - the public scheduler-start transaction;
 - a deterministic host port and focused host tests;
 - a Cortex-M4F 64-byte initial task frame;
@@ -39,10 +41,8 @@ The repository currently includes:
 
 The following Version 1 work remains:
 
-- SysTick and scheduler tick advancement;
-- runtime `rts_task_delay()` behavior and delayed-task wakeup orchestration;
 - time-slice expiry processing;
-- S32K148 clock, timer, interrupt-priority, vector-table, startup, and linker integration;
+- physical S32K148 validation of the implemented startup, vector, linker, and cooperative smoke image;
 - target execution tests and hardware validation.
 
 Synchronization primitives, runtime task creation, task deletion, EDF, rate-monotonic policy support, and floating-point context switching are intentionally outside the current baseline.
@@ -140,7 +140,9 @@ int main(void)
 }
 ```
 
-Board startup, clock configuration, interrupt setup, and the target configuration header must be supplied by the final S32K148 integration.
+The repository supplies the standalone smoke startup/linker configuration. A
+production board integration must still supply its reviewed clock, flashing,
+and deployment policy.
 
 ## Configuration
 
@@ -186,12 +188,12 @@ cmake -S . -B build-cortex-m4f \
   -DRTS_CONFIG_INCLUDE_DIR=<directory-containing-rts_config.h> \
   -DRTS_CORTEX_M_NVIC_PRIORITY_BITS=4 \
   -DRTS_CORTEX_M_PENDSV_PRIORITY=15 \
-  -DRTS_CORTEX_M_SVC_PRIORITY=14
+  -DRTS_CORTEX_M_SVC_PRIORITY=13
 
 cmake --build build-cortex-m4f
 ```
 
-The priority values above are an example and must match the final MCU integration and approved interrupt-priority policy. The current port supplies the architecture execution mechanism, not a complete S32K148 firmware image.
+The priority values above are an example and must match the final MCU integration and approved interrupt-priority policy. An SDK-dependent cooperative S32K148 smoke image is available with `RTS_BUILD_S32K148_SMOKE=ON`; provide NXP's `S32K148.h` directory through `RTS_S32K148_DEVICE_INCLUDE_DIR`.
 
 ## Repository layout
 
@@ -215,6 +217,7 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Private kernel baseline](docs/architecture/sprint-2-internal-kernel.md)
 - [Sprint 4 acceptance review](docs/architecture/sprint-4-acceptance-review.md)
 - [Cortex-M4F execution contract](docs/architecture/sprint-6-cortex-m4f-execution-contract.md)
+- [Sprint 6 acceptance review](docs/architecture/sprint-6-acceptance-review.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -232,7 +235,7 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 
 1. Implement the portable tick path and delayed-task wakeup transaction.
 2. Integrate time-slice expiry with switch planning.
-3. Add the S32K148 SysTick/NVIC, vector-table, startup, linker, and board contracts.
+3. Validate the S32K148 startup, linker, exception, and context-switch contracts on hardware.
 4. Run target-side ABI, interrupt, stack, and timing validation.
 5. Complete production-readiness and safety-analysis activities before deployment.
 

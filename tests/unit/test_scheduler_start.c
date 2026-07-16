@@ -83,6 +83,7 @@ static void test_idle_only_start(void)
     CHECK(rts_host_port_test_start_saved_stack_pointer() ==
           idle->saved_stack_pointer);
     CHECK(rts_host_port_test_critical_depth() == 0u);
+    CHECK(rts_host_port_test_tick_running());
     CHECK(rts_start() == RTS_STATUS_ALREADY_STARTED);
     CHECK(rts_host_port_test_start_request_count() == 1u);
 }
@@ -151,11 +152,29 @@ static void test_port_failure_rollback_and_retry(void)
     CHECK(!kernel->switch_plan.pending && !kernel->switch_plan.active);
     CHECK(rts_host_port_test_start_request_count() == 0u);
     CHECK(rts_host_port_test_critical_depth() == 0u);
+    CHECK(!rts_host_port_test_tick_running());
 
     CHECK(rts_start() == RTS_STATUS_OK);
     CHECK(kernel->current_task == task);
     CHECK(task->state == RTS_TASK_STATE_RUNNING);
     CHECK(rts_host_port_test_start_request_count() == 1u);
+    CHECK(rts_host_port_test_tick_running());
+}
+
+static void test_tick_start_failure_rollback(void)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+
+    reset_environment();
+    CHECK(rts_init() == RTS_STATUS_OK);
+    rts_host_port_test_fail_next_tick_start(true);
+    CHECK(rts_start() == RTS_STATUS_PORT_ERROR);
+    CHECK(kernel->lifecycle == RTS_KERNEL_INITIALIZED);
+    CHECK(kernel->current_task == NULL);
+    CHECK(!rts_host_port_test_tick_running());
+    CHECK(rts_host_port_test_start_request_count() == 0u);
+    CHECK(rts_start() == RTS_STATUS_OK);
+    CHECK(rts_host_port_test_tick_running());
 }
 
 static void test_start_then_yield_integration(void)
@@ -213,6 +232,7 @@ int main(void)
     test_idle_only_start();
     test_application_selection_and_fifo();
     test_port_failure_rollback_and_retry();
+    test_tick_start_failure_rollback();
     test_start_then_yield_integration();
 #if RTS_ENABLE_ASSERTIONS
     test_preflight_corruption_asserts();

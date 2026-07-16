@@ -594,3 +594,99 @@ elseif(MSVC)
     target_compile_options(rts_test_scheduler_start PRIVATE /W4 /WX)
 endif()
 add_test(NAME rts_scheduler_start COMMAND rts_test_scheduler_start)
+
+function(rts_add_time_test target config_directory)
+    add_executable(${target}
+        unit/test_time.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_time_test(rts_test_time tests/config)
+rts_add_time_test(rts_test_time_release tests/config_release)
+
+add_executable(rts_test_s32k148_tick_math
+    unit/test_s32k148_tick_math.c
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_tick_math.c
+)
+target_include_directories(rts_test_s32k148_tick_math PRIVATE
+    ${PROJECT_SOURCE_DIR}/tests/config
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(rts_test_s32k148_tick_math PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
+elseif(MSVC)
+    target_compile_options(rts_test_s32k148_tick_math PRIVATE /W4 /WX)
+endif()
+add_test(NAME rts_s32k148_tick_math COMMAND rts_test_s32k148_tick_math)
+
+add_executable(rts_test_s32k148_tick
+    unit/test_s32k148_tick.c
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_tick.c
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_tick_math.c
+    support/s32k148_cmsis_mock/cmsis_mock.c
+)
+target_include_directories(rts_test_s32k148_tick PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/support/s32k148_cmsis_mock
+    ${PROJECT_SOURCE_DIR}/tests/config
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/kernel
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148
+)
+target_compile_definitions(rts_test_s32k148_tick PRIVATE
+    RTS_CORTEX_M_NVIC_PRIORITY_BITS=4
+    RTS_CORTEX_M_SVC_PRIORITY=13
+    RTS_CORTEX_M_PENDSV_PRIORITY=15
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(rts_test_s32k148_tick PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
+elseif(MSVC)
+    target_compile_options(rts_test_s32k148_tick PRIVATE /W4 /WX)
+endif()
+add_test(NAME rts_s32k148_tick COMMAND rts_test_s32k148_tick)
+
+function(rts_add_task_delay_test target config_directory)
+    add_executable(${target}
+        unit/test_task_delay.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_task_delay_test(rts_test_task_delay tests/config)
+rts_add_task_delay_test(rts_test_task_delay_release tests/config_release)

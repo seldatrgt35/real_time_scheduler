@@ -46,16 +46,19 @@ rts_kernel_state_t *rts_kernel_state_get(void);
 rts_tcb_t *rts_scheduler_select_highest_ready(void);
 bool rts_scheduler_task_is_idle(const rts_tcb_t *task);
 bool rts_scheduler_task_is_runnable(const rts_tcb_t *task);
+bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task);
 rts_tcb_t *rts_scheduler_current_get(void);
 bool rts_scheduler_current_is_valid(void);
 bool rts_scheduler_current_establish(rts_tcb_t *task);
 bool rts_scheduler_current_release_initial(void);
 
-void rts_kernel_tick_isr(void);
+rts_tick_t rts_kernel_tick_now(void);
+bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks);
 bool rts_scheduler_prepare_switch(rts_tcb_t *next_task);
 void rts_scheduler_request_switch_if_needed(rts_tcb_t *next_task);
 bool rts_scheduler_switch_acquire(rts_switch_snapshot_t *snapshot);
 void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot);
 bool rts_scheduler_switch_reselection_required(void);
+bool rts_scheduler_reselect_after_switch(void);
 
 #endif /* RTS_SCHEDULER_INTERNAL_H */

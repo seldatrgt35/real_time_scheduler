@@ -27,6 +27,11 @@ bool rts_scheduler_current_is_valid(void)
     return test_current_valid;
 }
 
+bool rts_port_tick_commit_start(void)
+{
+    return true;
+}
+
 static void test_invalid_preconditions(void)
 {
     static _Alignas(RTS_TASK_STACK_ALIGNMENT) unsigned char stack[64];

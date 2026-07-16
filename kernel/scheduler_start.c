@@ -89,9 +89,19 @@ rts_status_t rts_start(void)
     kernel->lifecycle = RTS_KERNEL_RUNNING;
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
 
+    port_status = rts_port_tick_start();
+    if (port_status != RTS_STATUS_OK)
+    {
+        rts_port_tick_stop();
+        rts_start_rollback(kernel);
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_PORT_ERROR;
+    }
+
     port_status = rts_port_start_first_task();
     if (port_status != RTS_STATUS_OK)
     {
+        rts_port_tick_stop();
         rts_start_rollback(kernel);
         rts_port_critical_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;

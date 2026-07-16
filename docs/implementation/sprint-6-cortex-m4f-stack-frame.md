@@ -72,7 +72,7 @@ cmake -S . -B build-cm4 \
   -DRTS_CONFIG_INCLUDE_DIR=<application-config-directory> \
   -DRTS_CORTEX_M_NVIC_PRIORITY_BITS=4 \
   -DRTS_CORTEX_M_PENDSV_PRIORITY=15 \
-  -DRTS_CORTEX_M_SVC_PRIORITY=14
+  -DRTS_CORTEX_M_SVC_PRIORITY=13
 cmake --build build-cm4
 ```
 

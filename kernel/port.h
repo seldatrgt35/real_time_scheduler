@@ -26,6 +26,9 @@ rts_critical_token_t rts_port_critical_enter(void);
 void rts_port_critical_exit(rts_critical_token_t token);
 bool rts_port_is_in_isr(void);
 void rts_port_request_context_switch(void);
+rts_status_t rts_port_tick_start(void);
+bool rts_port_tick_commit_start(void);
+void rts_port_tick_stop(void);
 rts_status_t rts_port_start_first_task(void);
 
 #endif /* RTS_PORT_H */

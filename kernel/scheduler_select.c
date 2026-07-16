@@ -62,6 +62,37 @@ bool rts_scheduler_task_is_runnable(const rts_tcb_t *task)
     return rts_scheduler_task_is_runnable_in(rts_kernel_state_get(), task);
 }
 
+bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task)
+{
+    const rts_kernel_state_t *kernel = rts_kernel_state_get();
+    bool valid;
+
+    if (task == NULL || task == kernel->idle_task ||
+        !rts_task_handle_is_application_task((rts_task_handle_t)task))
+    {
+        return false;
+    }
+
+    valid = task->slot_state == RTS_TASK_SLOT_ALLOCATED &&
+            task->state == RTS_TASK_STATE_BLOCKED &&
+            task->wait.reason == RTS_WAIT_DELAY &&
+            task->saved_stack_pointer != NULL && task->stack_low != NULL &&
+            task->stack_high != NULL &&
+            (uintptr_t)task->stack_low < (uintptr_t)task->stack_high &&
+            task->entry != NULL &&
+            task->priority > RTS_IDLE_PRIORITY &&
+            (size_t)task->priority < (size_t)RTS_PRIORITY_COUNT &&
+            !rts_ready_contains(&kernel->ready_set, task) &&
+            task->ready_node.previous == NULL &&
+            task->ready_node.next == NULL &&
+            task->ready_node.object == NULL &&
+            rts_delay_contains(&kernel->delay_queue, task);
+#if RTS_ENABLE_ASSERTIONS
+    valid = valid && task->validation_magic == RTS_TASK_VALIDATION_MAGIC;
+#endif
+    return valid;
+}
+
 rts_tcb_t *rts_scheduler_select_highest_ready(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();

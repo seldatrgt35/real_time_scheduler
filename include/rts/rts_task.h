@@ -31,7 +31,8 @@ rts_status_t rts_task_yield(void);
  * Block the current task for a relative number of scheduler ticks.
  *
  * Valid only from a non-idle task in task context while the scheduler is
- * RUNNING. A zero delay has the same semantics as rts_task_yield().
+ * RUNNING. A zero delay has the same semantics as rts_task_yield(). Nonzero
+ * delays must not exceed RTS_DELAY_MAX.
  */
 rts_status_t rts_task_delay(rts_tick_t delay);
 

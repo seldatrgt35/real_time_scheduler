@@ -94,7 +94,7 @@ successful transfer begins task execution and normally does not return.
 
 `rts_task_delay(delay)` measures a relative interval from the tick value observed atomically during the call. For `1..RTS_DELAY_MAX`, the current task becomes blocked and is eligible—not guaranteed—to run when that many scheduler tick boundaries have elapsed. Higher-priority work can delay its actual execution.
 
-Zero has exactly yield semantics and returns the result of that operation. Values greater than `RTS_DELAY_MAX` return `INVALID_ARGUMENT`; limiting intervals to half the 32-bit range enables unambiguous modular wraparound comparison. Tick-counter wrap is handled internally and is invisible to the caller. Version 1 has no early wakeup, cancellation, absolute sleep, or spurious return: a successful nonzero delay returns only after expiry and redispatch. Calls before start return `INVALID_STATE`; ISR and idle-task calls return `INVALID_CONTEXT`.
+Zero has exactly yield semantics and returns the result of that operation. Values greater than `RTS_DELAY_MAX` return `INVALID_ARGUMENT`; limiting intervals to half the 32-bit range enables unambiguous modular wraparound comparison. Tick-counter wrap is handled internally and is invisible to the caller. Version 1 has no early wakeup, cancellation, absolute sleep, or spurious return: a successful nonzero delay returns only after expiry and redispatch. Calls before start return `INVALID_STATE`; ISR calls return `INVALID_CONTEXT`. The private idle task is not a public caller: an attempted idle delay is an internal invariant violation and returns `INVALID_STATE` after the configured assertion path.
 
 ## 10. Priority semantics
 

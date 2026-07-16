@@ -20,3 +20,17 @@ bool rts_port_is_in_isr(void)
 {
     return false;
 }
+
+bool rts_port_tick_commit_start(void)
+{
+    return true;
+}
+
+rts_status_t rts_port_tick_start(void)
+{
+    return RTS_STATUS_OK;
+}
+
+void rts_port_tick_stop(void)
+{
+}

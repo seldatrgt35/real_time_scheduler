@@ -71,6 +71,7 @@ static void test_successful_bootstrap(void)
     CHECK(kernel->lifecycle == RTS_KERNEL_INITIALIZED);
     CHECK(rts_host_port_test_is_initialized());
     CHECK(rts_host_port_test_critical_depth() == 0u);
+    CHECK(!rts_host_port_test_tick_running());
     CHECK(kernel->current_task == NULL);
     CHECK(kernel->current_tick == 0u);
     CHECK(kernel->switch_plan.from == NULL && kernel->switch_plan.to == NULL &&

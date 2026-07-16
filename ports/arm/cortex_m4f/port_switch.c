@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "assert_internal.h"
+#include "port.h"
 #include "port_offsets.h"
 
 static rts_cm4f_switch_handoff_t rts_cm4f_switch_handoff;
@@ -51,7 +52,8 @@ const rts_cm4f_switch_handoff_t *rts_cm4f_switch_bridge_acquire(
     valid = snapshot.from == kernel->current_task &&
             snapshot.from != NULL && snapshot.to != NULL &&
             snapshot.from != snapshot.to &&
-            snapshot.from->state == RTS_TASK_STATE_RUNNING &&
+            (snapshot.from->state == RTS_TASK_STATE_RUNNING ||
+             snapshot.from->state == RTS_TASK_STATE_BLOCKED) &&
             snapshot.to->state == RTS_TASK_STATE_READY &&
             rts_cm4f_saved_sp_is_valid(snapshot.from,
                                         outgoing_saved_stack_pointer) &&
@@ -84,6 +86,7 @@ bool rts_cm4f_switch_bridge_complete(
     const rts_cm4f_switch_handoff_t *handoff)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
+    bool notify_port;
     bool valid = handoff == &rts_cm4f_switch_handoff &&
                  kernel->switch_plan.active &&
                  !kernel->switch_plan.pending &&
@@ -102,10 +105,15 @@ bool rts_cm4f_switch_bridge_complete(
     }
 
     rts_scheduler_switch_complete(&handoff->snapshot);
+    notify_port = rts_scheduler_reselect_after_switch();
+    if (notify_port)
+    {
+        rts_port_request_context_switch();
+    }
     valid = !kernel->switch_plan.active &&
-            !kernel->switch_plan.pending &&
             kernel->current_task == handoff->to &&
-            handoff->from->state == RTS_TASK_STATE_READY &&
+            (handoff->from->state == RTS_TASK_STATE_READY ||
+             handoff->from->state == RTS_TASK_STATE_BLOCKED) &&
             handoff->to->state == RTS_TASK_STATE_RUNNING;
     RTS_FATAL_UNLESS(valid);
     return valid;

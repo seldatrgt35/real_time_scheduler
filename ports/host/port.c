@@ -18,6 +18,9 @@ static bool rts_host_interrupts_masked;
 static bool rts_host_fail_next_stack_initialize;
 static bool rts_host_fail_next_initialize;
 static bool rts_host_initialized;
+static bool rts_host_tick_ready;
+static bool rts_host_tick_running;
+static bool rts_host_fail_next_tick_start;
 static size_t rts_host_critical_depth;
 static size_t rts_host_switch_request_count;
 static size_t rts_host_last_switch_request_critical_depth;
@@ -80,6 +83,7 @@ rts_status_t rts_port_initialize(void)
     }
 
     rts_host_initialized = true;
+    rts_host_tick_ready = true;
     return RTS_STATUS_OK;
 }
 
@@ -209,6 +213,26 @@ void rts_port_request_context_switch(void)
     rts_host_switch_request_pending = true;
 }
 
+rts_status_t rts_port_tick_start(void)
+{
+    if (rts_host_fail_next_tick_start)
+    {
+        rts_host_fail_next_tick_start = false;
+        return RTS_STATUS_PORT_ERROR;
+    }
+    if (!rts_host_tick_ready || rts_host_tick_running)
+    {
+        return RTS_STATUS_INVALID_STATE;
+    }
+    rts_host_tick_running = true;
+    return RTS_STATUS_OK;
+}
+
+void rts_port_tick_stop(void)
+{
+    rts_host_tick_running = false;
+}
+
 bool rts_host_port_initial_frame_read(const void *saved_stack_pointer,
                                       rts_host_initial_frame_t *out_frame)
 {
@@ -222,6 +246,11 @@ bool rts_host_port_initial_frame_read(const void *saved_stack_pointer,
                         sizeof(*out_frame));
     return out_frame->magic == RTS_HOST_INITIAL_FRAME_MAGIC &&
            out_frame->version == RTS_HOST_INITIAL_FRAME_VERSION;
+}
+
+bool rts_port_tick_commit_start(void)
+{
+    return rts_host_tick_running;
 }
 
 void rts_host_port_task_return_trap(void)
@@ -241,6 +270,9 @@ void rts_host_port_test_reset(void)
     rts_host_fail_next_stack_initialize = false;
     rts_host_fail_next_initialize = false;
     rts_host_initialized = false;
+    rts_host_tick_ready = false;
+    rts_host_tick_running = false;
+    rts_host_fail_next_tick_start = false;
     rts_host_critical_depth = 0u;
     rts_host_switch_request_count = 0u;
     rts_host_last_switch_request_critical_depth = 0u;
@@ -264,6 +296,16 @@ void rts_host_port_test_fail_next_stack_initialize(bool fail)
 void rts_host_port_test_fail_next_initialize(bool fail)
 {
     rts_host_fail_next_initialize = fail;
+}
+
+void rts_host_port_test_fail_next_tick_start(bool fail)
+{
+    rts_host_fail_next_tick_start = fail;
+}
+
+bool rts_host_port_test_tick_running(void)
+{
+    return rts_host_tick_running;
 }
 
 bool rts_host_port_test_is_initialized(void)

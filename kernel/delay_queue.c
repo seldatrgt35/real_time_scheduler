@@ -3,8 +3,7 @@
 #include <stdint.h>
 
 #include "assert_internal.h"
-
-#define RTS_DELAY_HALF_RANGE (RTS_DELAY_MAX + UINT32_C(1))
+#include "time_internal.h"
 
 #define RTS_DELAY_REQUIRE_VOID(condition)     \
     do                                        \
@@ -42,13 +41,13 @@ static bool rts_tick_is_before(rts_tick_t first,
 {
     const rts_tick_t difference = first - second;
 
-    if (difference == RTS_DELAY_HALF_RANGE)
+    if (difference == RTS_TICK_HALF_RANGE)
     {
-        RTS_ASSERT(difference != RTS_DELAY_HALF_RANGE);
+        RTS_ASSERT(difference != RTS_TICK_HALF_RANGE);
         return false;
     }
 
-    *is_before = difference > RTS_DELAY_MAX;
+    *is_before = rts_tick_before(first, second);
     return true;
 }
 
@@ -169,5 +168,5 @@ bool rts_delay_contains(const rts_delay_queue_t *delay_queue,
 
 bool rts_tick_deadline_reached(rts_tick_t now, rts_tick_t deadline)
 {
-    return (now - deadline) <= RTS_DELAY_MAX;
+    return rts_tick_reached(now, deadline);
 }

@@ -104,6 +104,10 @@ int main(void)
     /* Emulate only the two symbolic-offset loads/stores performed by assembly. */
     a->saved_stack_pointer = outgoing_saved_sp;
     CHECK(b->saved_stack_pointer == handoff->incoming_saved_stack_pointer);
+    rts_ready_remove(&kernel->ready_set, c);
+    c->priority = 7u;
+    rts_ready_insert(&kernel->ready_set, c);
+    b_next = b->ready_node.next;
     CHECK(!rts_scheduler_prepare_switch(c));
     CHECK(rts_scheduler_switch_reselection_required());
     CHECK(rts_cm4f_switch_bridge_complete(handoff));
@@ -111,8 +115,10 @@ int main(void)
     CHECK(kernel->current_task == b);
     CHECK(a->state == RTS_TASK_STATE_READY);
     CHECK(b->state == RTS_TASK_STATE_RUNNING);
-    CHECK(!kernel->switch_plan.active && !kernel->switch_plan.pending);
-    CHECK(rts_scheduler_switch_reselection_required());
+    CHECK(!kernel->switch_plan.active && kernel->switch_plan.pending);
+    CHECK(kernel->switch_plan.from == b && kernel->switch_plan.to == c);
+    CHECK(rts_host_port_test_switch_request_count() == 2u);
+    CHECK(!rts_scheduler_switch_reselection_required());
     CHECK(a->ready_node.next == a_next);
     CHECK(b->ready_node.next == b_next);
     CHECK(a->priority == a_priority && b->priority == b_priority);
