@@ -32,10 +32,14 @@ typedef struct
     rts_tcb_t idle_task_storage;
     _Alignas(RTS_TASK_STACK_ALIGNMENT)
     unsigned char idle_stack[RTS_IDLE_STACK_SIZE_BYTES];
+    rts_tcb_t timer_service_task_storage;
+    _Alignas(RTS_TASK_STACK_ALIGNMENT)
+    unsigned char timer_service_stack[RTS_TIMER_SERVICE_STACK_SIZE_BYTES];
 
     rts_kernel_lifecycle_t lifecycle;
     rts_tcb_t *current_task;
     rts_tcb_t *idle_task;
+    rts_tcb_t *timer_service_task;
     rts_ready_set_t ready_set;
     rts_delay_queue_t delay_queue;
     rts_tick_t current_tick;
@@ -49,6 +53,7 @@ rts_kernel_state_t *rts_kernel_state_get(void);
 
 rts_tcb_t *rts_scheduler_select_highest_ready(void);
 bool rts_scheduler_task_is_idle(const rts_tcb_t *task);
+bool rts_scheduler_task_is_timer_service(const rts_tcb_t *task);
 bool rts_scheduler_task_is_runnable(const rts_tcb_t *task);
 bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task);
 bool rts_scheduler_task_is_blocked_wait(const rts_tcb_t *task);
@@ -56,6 +61,9 @@ rts_tcb_t *rts_scheduler_current_get(void);
 bool rts_scheduler_current_is_valid(void);
 bool rts_scheduler_current_establish(rts_tcb_t *task);
 bool rts_scheduler_current_release_initial(void);
+bool rts_scheduler_timer_service_wake(void);
+bool rts_scheduler_timer_service_block(void);
+void rts_scheduler_timer_service_cancel_wake(void);
 
 rts_tick_t rts_kernel_tick_now(void);
 bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks);

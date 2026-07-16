@@ -18,7 +18,8 @@ enum
     RTS_SMOKE_FAILURE_HANDLER_STACK = UINT32_C(1) << 8,
     RTS_SMOKE_FAILURE_YIELD = UINT32_C(1) << 9,
     RTS_SMOKE_FAILURE_CREATE_C = UINT32_C(1) << 10,
-    RTS_SMOKE_FAILURE_SEMAPHORE = UINT32_C(1) << 11
+    RTS_SMOKE_FAILURE_SEMAPHORE = UINT32_C(1) << 11,
+    RTS_SMOKE_FAILURE_TIMER = UINT32_C(1) << 12
 };
 
 typedef struct
@@ -63,6 +64,12 @@ typedef struct
     volatile uint32_t task_a_max_stack_used;
     volatile uint32_t task_b_max_stack_used;
     volatile uint32_t task_c_max_stack_used;
+    volatile uint32_t timer_periodic_callback_count;
+    volatile uint32_t timer_one_shot_callback_count;
+    volatile uint32_t timer_callback_psp;
+    volatile uint32_t timer_callback_ipsr;
+    volatile uint32_t timer_service_identity_valid;
+    volatile uint32_t timer_stop_restart_count;
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;

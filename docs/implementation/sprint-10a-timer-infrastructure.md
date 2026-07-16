@@ -1,5 +1,10 @@
 # Sprint 10A Software Timer Infrastructure
 
+> Sprint 10B supersedes the callback-free runtime boundary in this document.
+> Pool ownership, active-queue ordering, and public handles remain valid; final
+> execution semantics are defined in
+> `sprint-10b-timer-callback-service.md`.
+
 ## Scope
 
 Sprint 10A adds the static software-timer subsystem and tick-side expiration
@@ -158,4 +163,3 @@ and whether an internal timer service task is required. It may consume EXPIRED
 timers and their prepared periodic deadline. It must not execute application
 callbacks in the tick ISR or while the kernel critical section is held unless
 a separately reviewed contract explicitly changes this boundary.
-

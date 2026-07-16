@@ -21,6 +21,12 @@ enum
 
 typedef void (*rts_timer_callback_t)(void *argument);
 
+/*
+ * Callbacks are serialized in the private timer-service task, never in an ISR
+ * or kernel critical section. Operations that would block that service task
+ * return RTS_STATUS_INVALID_CONTEXT.
+ */
+
 typedef struct
 {
     rts_tick_t period;

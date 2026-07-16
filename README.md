@@ -41,8 +41,8 @@ The repository currently includes:
 - centralized fatal/assert handling and S32K148 HardFault evidence capture;
 - optional stack guards, stack watermarking, runtime counters, private
   snapshots, a fixed trace ring, and bounded global invariant validation;
-- statically pooled one-shot and periodic software-timer infrastructure with a
-  dedicated ordered queue and callback-free expiration detection;
+- statically pooled one-shot and periodic software timers with a dedicated
+  active queue, bounded callback FIFO, and private deferred service task;
 - deterministic 20,000-event diagnostics stress tests in enabled, release, and
   no-time-slicing configurations;
 - the public scheduler-start transaction;
@@ -56,9 +56,8 @@ The following Version 1 work remains:
 - physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
-Software-timer callback execution and periodic re-arming, runtime task creation,
-task deletion, EDF, rate-monotonic policy support, and floating-point context
-switching remain outside the current baseline.
+Runtime task creation, task deletion, EDF, rate-monotonic policy support, and
+floating-point context switching remain outside the current baseline.
 
 ## Scheduling model
 
@@ -120,9 +119,9 @@ Semaphore objects are caller-owned, zero-initialized static objects. An initiali
 All memory is statically bounded:
 
 - the kernel owns `RTS_MAX_TASKS` private application TCB objects;
-- the kernel owns `RTS_MAX_TIMERS` private software-timer objects and their
-  dedicated ordered queue;
-- the kernel owns a separate private idle TCB and idle stack;
+- the kernel owns `RTS_MAX_TIMERS` private software-timer objects, their
+  dedicated ordered queue, and the bounded callback-work ring;
+- the kernel owns separate private idle and timer-service TCBs and stacks;
 - the application owns every application-task stack for the task's lifetime;
 - a successful opaque task handle points directly to a stable private TCB; and
 - no dynamic allocation, pool growth, or task deletion is used.
@@ -188,6 +187,9 @@ Every build selects exactly one `rts_config.h`. The current private and public c
 | --- | --- |
 | `RTS_MAX_TASKS` | Number of application-task pool slots |
 | `RTS_MAX_TIMERS` | Number of private software-timer pool slots |
+| `RTS_TIMER_SERVICE_PRIORITY` | Fixed priority of the private callback service |
+| `RTS_TIMER_SERVICE_STACK_SIZE_BYTES` | Private callback-service stack bytes |
+| `RTS_TIMER_CALLBACK_QUEUE_CAPACITY` | Fixed callback-work ring capacity |
 | `RTS_PRIORITY_COUNT` | Total priority levels, including idle priority zero |
 | `RTS_TICK_RATE_HZ` | Scheduler tick frequency |
 | `RTS_ENABLE_TIME_SLICING` | Enables equal-priority time slicing |
@@ -266,6 +268,8 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Sprint 9 diagnostics implementation](docs/implementation/sprint-9-kernel-diagnostics.md)
 - [Sprint 9 acceptance review](docs/architecture/sprint-9-acceptance-review.md)
 - [Sprint 10A timer infrastructure](docs/implementation/sprint-10a-timer-infrastructure.md)
+- [Sprint 10B callback service](docs/implementation/sprint-10b-timer-callback-service.md)
+- [Sprint 10 acceptance review](docs/architecture/sprint-10-acceptance-review.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -283,7 +287,7 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 
 1. Run the long-duration S32K148 smoke and deliberate fault-capture image.
 2. Measure target stack margins, context-switch latency, and critical windows.
-3. Complete Software Timer callback execution and periodic policy in Sprint 10B.
+3. Design Tickless Idle and Power Management using ordered delay/timer heads.
 4. Complete production-readiness and safety-analysis activities before deployment.
 
 ## License

@@ -6,6 +6,7 @@
 #include "rts/rts.h"
 #include "rts/rts_task.h"
 #include "scheduler_internal.h"
+#include "timer_internal.h"
 
 #define TEST_STACK_BYTES 256u
 
@@ -50,6 +51,7 @@ static void check_reset_kernel(void)
     CHECK(kernel->application_task_pool.allocated_count == 0u);
     CHECK(kernel->application_task_pool.next_free_hint == 0u);
     CHECK(kernel->idle_task == NULL);
+    CHECK(kernel->timer_service_task == NULL);
     CHECK(kernel->current_task == NULL);
     CHECK(kernel->current_tick == 0u);
     CHECK(kernel->ready_set.priority_queue[0].count == 0u);
@@ -63,6 +65,7 @@ static void test_successful_bootstrap(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_tcb_t *idle;
+    rts_tcb_t *service;
     rts_host_initial_frame_t frame;
     size_t index;
 
@@ -78,6 +81,8 @@ static void test_successful_bootstrap(void)
           !kernel->switch_plan.pending);
     CHECK(rts_task_pool_allocated_count(&kernel->application_task_pool) == 0u);
     CHECK(rts_task_pool_next_free_hint(&kernel->application_task_pool) == 0u);
+    CHECK(rts_timer_allocated_count() == 0u);
+    CHECK(rts_timer_manager_get()->callback_queue.count == 0u);
     for (index = 0u; index < (size_t)RTS_MAX_TASKS; ++index)
     {
         CHECK(kernel->application_task_pool.slots[index].slot_state ==
@@ -106,6 +111,23 @@ static void test_successful_bootstrap(void)
 #if RTS_ENABLE_ASSERTIONS
     CHECK(idle->validation_magic == RTS_TASK_VALIDATION_MAGIC);
 #endif
+
+    service = kernel->timer_service_task;
+    CHECK(service == &kernel->timer_service_task_storage);
+    CHECK(service->slot_state == RTS_TASK_SLOT_ALLOCATED);
+    CHECK(service->state == RTS_TASK_STATE_BLOCKED);
+    CHECK(service->priority == (rts_priority_t)RTS_TIMER_SERVICE_PRIORITY);
+    CHECK(service->saved_stack_pointer != NULL);
+    CHECK(service->stack_low == kernel->timer_service_stack);
+    CHECK(service->stack_high == kernel->timer_service_stack +
+                                 sizeof kernel->timer_service_stack);
+    CHECK(service->entry == rts_timer_service_entry);
+    CHECK(service->wait.reason == RTS_WAIT_TIMER_SERVICE);
+    CHECK(!rts_ready_contains(&kernel->ready_set, service));
+    CHECK(!rts_delay_contains(&kernel->delay_queue, service));
+    CHECK(rts_host_port_initial_frame_read(service->saved_stack_pointer,
+                                           &frame));
+    CHECK(frame.entry == rts_timer_service_entry);
 }
 
 static void test_repeated_and_running_status(void)

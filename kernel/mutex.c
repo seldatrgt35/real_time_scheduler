@@ -11,6 +11,7 @@
 #include "wait_object_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "config_internal.h"
 
 bool rts_mutex_is_valid(const rts_mutex_t *mutex)
 {
@@ -128,7 +129,8 @@ static bool rts_mutex_would_cycle(const rts_tcb_t *current,
     const rts_tcb_t *task = mutex->owner;
     size_t depth;
 
-    for (depth = 0u; task != NULL && depth < (size_t)RTS_MAX_TASKS; ++depth)
+    for (depth = 0u; task != NULL &&
+                     depth < RTS_SCHEDULABLE_TASK_CAPACITY; ++depth)
     {
         if (task == current)
         {
@@ -220,6 +222,11 @@ rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout)
     {
         rts_port_critical_exit(token);
         return RTS_STATUS_TIMEOUT;
+    }
+    if (rts_scheduler_task_is_timer_service(current))
+    {
+        rts_port_critical_exit(token);
+        return RTS_STATUS_INVALID_CONTEXT;
     }
     if (current->owned_mutex_count >= (size_t)RTS_MAX_MUTEXES_PER_TASK)
     {

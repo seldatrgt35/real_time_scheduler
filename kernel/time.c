@@ -154,7 +154,10 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
         woke_task = true;
     }
 
-    rts_timer_manager_process_expired(kernel->current_tick);
+    if (rts_timer_manager_process_expired(kernel->current_tick))
+    {
+        woke_task = true;
+    }
 
     slice_rotated = !current_woke &&
                     rts_tick_account_current_slice(kernel, elapsed_ticks);

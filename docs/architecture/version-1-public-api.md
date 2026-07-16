@@ -250,3 +250,18 @@ and argument pointers are copied; their referenced lifetimes must cover all
 future use. Sprint 10A stores but never invokes callbacks. Tick expiration only
 changes private timer state to EXPIRED, so this amendment adds no callback
 execution context, task wakeup, or scheduling behavior.
+
+### Sprint 10B completion
+
+Sprint 10B supersedes the final callback-free sentence above. Expiration now
+publishes bounded private work and wakes a private timer-service task;
+callbacks execute serially in ordinary Thread mode after the kernel critical
+section is released. They may use timer controls, yield, semaphore give,
+immediately available semaphore take, and uncontended mutex lock/unlock.
+Operations that would block the single service task—positive delay,
+unavailable semaphore take, or contended mutex lock—return
+`RTS_STATUS_INVALID_CONTEXT`. No ISR timer-control API is added.
+
+`RTS_TIMER_SERVICE_PRIORITY`, `RTS_TIMER_SERVICE_STACK_SIZE_BYTES`, and
+`RTS_TIMER_CALLBACK_QUEUE_CAPACITY` are required build-wide configuration.
+The service TCB and stack are private and do not consume `RTS_MAX_TASKS`.

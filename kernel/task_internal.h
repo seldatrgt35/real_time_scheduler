@@ -31,7 +31,8 @@ enum
     RTS_WAIT_NONE = 0,
     RTS_WAIT_DELAY,
     RTS_WAIT_SEMAPHORE,
-    RTS_WAIT_MUTEX
+    RTS_WAIT_MUTEX,
+    RTS_WAIT_TIMER_SERVICE
 };
 
 typedef uint8_t rts_wait_result_t;

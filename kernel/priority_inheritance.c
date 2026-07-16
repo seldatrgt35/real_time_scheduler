@@ -9,6 +9,7 @@
 #include "wait_object_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "config_internal.h"
 
 static rts_wait_object_storage_t *rts_priority_waiters_for(rts_tcb_t *task)
 {
@@ -103,10 +104,10 @@ static rts_priority_t rts_priority_required_by_owned(const rts_tcb_t *task)
 
 bool rts_priority_recompute_chain(rts_tcb_t *task)
 {
-    rts_tcb_t *visited[RTS_MAX_TASKS];
+    rts_tcb_t *visited[RTS_MAX_TASKS + 2u];
     size_t depth = 0u;
 
-    while (task != NULL && depth < (size_t)RTS_MAX_TASKS)
+    while (task != NULL && depth < RTS_SCHEDULABLE_TASK_CAPACITY)
     {
         size_t index;
         rts_priority_t required;

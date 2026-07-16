@@ -29,6 +29,12 @@ typedef struct
     uint32_t timer_stops;
     uint32_t timer_restarts;
     uint32_t timer_expirations;
+    uint32_t timer_callbacks_executed;
+    uint32_t timer_stale_callbacks;
+    uint32_t timer_missed_periods;
+    uint32_t timer_overruns;
+    uint32_t timer_callback_queue_maximum_depth;
+    uint32_t timer_callback_queue_overflows;
 } rts_runtime_counters_t;
 
 typedef struct

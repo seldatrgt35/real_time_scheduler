@@ -12,6 +12,14 @@ bool rts_scheduler_task_is_idle(const rts_tcb_t *task)
            task == &kernel->idle_task_storage;
 }
 
+bool rts_scheduler_task_is_timer_service(const rts_tcb_t *task)
+{
+    const rts_kernel_state_t *kernel = rts_kernel_state_get();
+
+    return task != NULL && task == kernel->timer_service_task &&
+           task == &kernel->timer_service_task_storage;
+}
+
 static bool rts_scheduler_task_is_runnable_in(
     const rts_kernel_state_t *kernel,
     const rts_tcb_t *task)
@@ -45,7 +53,8 @@ static bool rts_scheduler_task_is_runnable_in(
     {
         identity_is_valid =
             (size_t)task->priority < (size_t)RTS_PRIORITY_COUNT &&
-            rts_task_handle_is_application_task((rts_task_handle_t)task);
+            (rts_task_handle_is_application_task((rts_task_handle_t)task) ||
+             rts_scheduler_task_is_timer_service(task));
     }
 
     state_is_valid = task->state == RTS_TASK_STATE_READY ||
@@ -111,9 +120,27 @@ bool rts_scheduler_task_is_blocked_wait(const rts_tcb_t *task)
     bool valid;
 
     if (task == NULL || task == kernel->idle_task ||
-        !rts_task_handle_is_application_task((rts_task_handle_t)task))
+        (!rts_task_handle_is_application_task((rts_task_handle_t)task) &&
+         !rts_scheduler_task_is_timer_service(task)))
     {
         return false;
+    }
+
+    if (rts_scheduler_task_is_timer_service(task))
+    {
+        valid = task->slot_state == RTS_TASK_SLOT_ALLOCATED &&
+                task->state == RTS_TASK_STATE_BLOCKED &&
+                task->wait.reason == RTS_WAIT_TIMER_SERVICE &&
+                task->wait.result == RTS_WAIT_RESULT_NONE &&
+                task->wait.object == NULL && !task->wait.timeout_active &&
+                task->wait_node.owner == NULL &&
+                task->delay_node.owner == NULL &&
+                !rts_ready_contains(&kernel->ready_set, task);
+#if RTS_ENABLE_ASSERTIONS
+        valid = valid &&
+                task->validation_magic == RTS_TASK_VALIDATION_MAGIC;
+#endif
+        return valid;
     }
 
     valid = task->slot_state == RTS_TASK_SLOT_ALLOCATED &&
@@ -243,4 +270,79 @@ bool rts_scheduler_current_release_initial(void)
     RTS_FATAL_UNLESS(rts_ready_contains(&kernel->ready_set, current));
     return rts_ready_contains(&kernel->ready_set, current) &&
            rts_scheduler_current_is_valid();
+}
+
+bool rts_scheduler_timer_service_wake(void)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    rts_tcb_t *service = kernel->timer_service_task;
+
+    if (service == NULL || service->state != RTS_TASK_STATE_BLOCKED ||
+        service->wait.reason != RTS_WAIT_TIMER_SERVICE ||
+        service->wait.object != NULL || service->wait.timeout_active ||
+        rts_ready_contains(&kernel->ready_set, service))
+    {
+        return false;
+    }
+    service->wait.reason = RTS_WAIT_NONE;
+    service->wait.result = RTS_WAIT_RESULT_NONE;
+    service->state = RTS_TASK_STATE_READY;
+    service->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+    rts_ready_insert(&kernel->ready_set, service);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(service->diagnostic_wake_count);
+#endif
+    RTS_FATAL_UNLESS(rts_scheduler_task_is_runnable(service));
+    return true;
+}
+
+bool rts_scheduler_timer_service_block(void)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    rts_tcb_t *service = kernel->timer_service_task;
+    rts_tcb_t *selected;
+
+    if (service == NULL || kernel->current_task != service ||
+        service->state != RTS_TASK_STATE_RUNNING ||
+        !rts_ready_is_front(&kernel->ready_set, service) ||
+        service->wait.reason != RTS_WAIT_NONE)
+    {
+        return false;
+    }
+    rts_ready_remove(&kernel->ready_set, service);
+    service->wait.reason = RTS_WAIT_TIMER_SERVICE;
+    service->wait.result = RTS_WAIT_RESULT_NONE;
+    service->wait.wake_tick = 0u;
+    service->wait.object = NULL;
+    service->wait.timeout_active = false;
+    service->state = RTS_TASK_STATE_BLOCKED;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(service->diagnostic_block_count);
+#endif
+    selected = rts_scheduler_select_highest_ready();
+    RTS_FATAL_UNLESS(selected != NULL && selected != service);
+    return selected != NULL && selected != service &&
+           rts_scheduler_prepare_switch(selected);
+}
+
+void rts_scheduler_timer_service_cancel_wake(void)
+{
+    rts_kernel_state_t *kernel = rts_kernel_state_get();
+    rts_tcb_t *service = kernel->timer_service_task;
+
+    if (service == NULL || service->state != RTS_TASK_STATE_READY)
+    {
+        return;
+    }
+    if (kernel->switch_plan.pending && kernel->switch_plan.to == service)
+    {
+        (void)rts_scheduler_prepare_switch(kernel->current_task);
+    }
+    rts_ready_remove(&kernel->ready_set, service);
+    service->wait.reason = RTS_WAIT_TIMER_SERVICE;
+    service->wait.result = RTS_WAIT_RESULT_NONE;
+    service->wait.wake_tick = 0u;
+    service->wait.object = NULL;
+    service->wait.timeout_active = false;
+    service->state = RTS_TASK_STATE_BLOCKED;
 }

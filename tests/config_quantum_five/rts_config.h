@@ -3,6 +3,9 @@
 
 #define RTS_MAX_TASKS                 6u
 #define RTS_MAX_TIMERS                8u
+#define RTS_TIMER_SERVICE_PRIORITY    14u
+#define RTS_TIMER_SERVICE_STACK_SIZE_BYTES 512u
+#define RTS_TIMER_CALLBACK_QUEUE_CAPACITY RTS_MAX_TIMERS
 #define RTS_PRIORITY_COUNT            16u
 #define RTS_TICK_RATE_HZ              1000u
 #define RTS_ENABLE_TIME_SLICING       1

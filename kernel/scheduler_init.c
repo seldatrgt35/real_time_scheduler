@@ -19,6 +19,7 @@ static void rts_idle_entry(void *argument)
 static void rts_kernel_restore_reset(rts_kernel_state_t *kernel)
 {
     *kernel = (rts_kernel_state_t){0};
+    rts_timer_manager_initialize();
 }
 
 static void rts_idle_object_initialize(rts_kernel_state_t *kernel)
@@ -61,6 +62,50 @@ static void rts_idle_object_initialize(rts_kernel_state_t *kernel)
 #if RTS_ENABLE_ASSERTIONS
     idle->validation_magic = 0u;
 #endif
+}
+
+static void rts_timer_service_object_initialize(rts_kernel_state_t *kernel)
+{
+    rts_tcb_t *service = &kernel->timer_service_task_storage;
+
+    service->saved_stack_pointer = NULL;
+    service->stack_low = kernel->timer_service_stack;
+    service->stack_high = kernel->timer_service_stack +
+                          sizeof(kernel->timer_service_stack);
+    service->entry = rts_timer_service_entry;
+    service->argument = NULL;
+    rts_list_node_initialize(&service->ready_node);
+    rts_list_node_initialize(&service->delay_node);
+    service->wait_node.previous = NULL;
+    service->wait_node.next = NULL;
+    service->wait_node.owner = NULL;
+    service->wait.reason = RTS_WAIT_TIMER_SERVICE;
+    service->wait.result = RTS_WAIT_RESULT_NONE;
+    service->wait.wake_tick = 0u;
+    service->wait.object = NULL;
+    service->wait.timeout_active = false;
+    service->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+    service->owned_mutex_head = NULL;
+    service->owned_mutex_tail = NULL;
+    service->owned_mutex_count = 0u;
+    service->base_priority = (rts_priority_t)RTS_TIMER_SERVICE_PRIORITY;
+    service->priority = (rts_priority_t)RTS_TIMER_SERVICE_PRIORITY;
+    service->state = RTS_TASK_STATE_BLOCKED;
+    service->slot_state = RTS_TASK_SLOT_ALLOCATED;
+#if RTS_ENABLE_RUNTIME_STATS
+    service->diagnostic_dispatch_count = 0u;
+    service->diagnostic_block_count = 0u;
+    service->diagnostic_wake_count = 0u;
+    service->diagnostic_running_ticks = 0u;
+    service->diagnostic_last_start_tick = 0u;
+#endif
+#if RTS_ENABLE_STACK_WATERMARK
+    service->diagnostic_max_stack_used = 0u;
+#endif
+#if RTS_ENABLE_ASSERTIONS
+    service->validation_magic = RTS_TASK_VALIDATION_MAGIC;
+#endif
+    kernel->timer_service_task = service;
 }
 
 rts_status_t rts_init(void)
@@ -106,7 +151,6 @@ rts_status_t rts_init(void)
     rts_task_pool_initialize(&kernel->application_task_pool);
     rts_ready_initialize(&kernel->ready_set);
     rts_delay_initialize(&kernel->delay_queue);
-    rts_timer_manager_initialize();
 
     port_status = rts_port_initialize();
     if (port_status != RTS_STATUS_OK)
@@ -115,6 +159,23 @@ rts_status_t rts_init(void)
         rts_port_critical_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
+
+    rts_timer_service_object_initialize(kernel);
+    rts_stack_diagnostics_prepare(
+        kernel->timer_service_task_storage.stack_low,
+        kernel->timer_service_task_storage.stack_high);
+    stack_result = rts_port_stack_initialize(
+        kernel->timer_service_stack, sizeof(kernel->timer_service_stack),
+        rts_timer_service_entry, NULL);
+    if (stack_result.status != RTS_STATUS_OK ||
+        stack_result.saved_stack_pointer == NULL)
+    {
+        rts_kernel_restore_reset(kernel);
+        rts_port_critical_exit(critical_token);
+        return RTS_STATUS_PORT_ERROR;
+    }
+    kernel->timer_service_task_storage.saved_stack_pointer =
+        stack_result.saved_stack_pointer;
 
     rts_idle_object_initialize(kernel);
     rts_stack_diagnostics_prepare(kernel->idle_task_storage.stack_low,

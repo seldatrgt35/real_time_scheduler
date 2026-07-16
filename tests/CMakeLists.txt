@@ -371,8 +371,12 @@ add_test(NAME rts_task_create COMMAND rts_test_task_create)
 
 add_library(rts_kernel_bootstrap STATIC
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_init.c
+    ${PROJECT_SOURCE_DIR}/kernel/scheduler_select.c
+    ${PROJECT_SOURCE_DIR}/kernel/switch_plan.c
     ${PROJECT_SOURCE_DIR}/kernel/timer.c
     ${PROJECT_SOURCE_DIR}/kernel/timer_queue.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_callback_queue.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_service.c
 )
 
 target_include_directories(rts_kernel_bootstrap
@@ -560,6 +564,8 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/mutex.c
     ${PROJECT_SOURCE_DIR}/kernel/timer.c
     ${PROJECT_SOURCE_DIR}/kernel/timer_queue.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_callback_queue.c
+    ${PROJECT_SOURCE_DIR}/kernel/timer_service.c
     ${PROJECT_SOURCE_DIR}/kernel/fatal.c
     ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
     ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c

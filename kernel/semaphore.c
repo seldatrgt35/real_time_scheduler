@@ -185,6 +185,11 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
         rts_port_critical_exit(token);
         return RTS_STATUS_TIMEOUT;
     }
+    if (rts_scheduler_task_is_timer_service(kernel->current_task))
+    {
+        rts_port_critical_exit(token);
+        return RTS_STATUS_INVALID_CONTEXT;
+    }
     if (kernel->lifecycle != RTS_KERNEL_RUNNING ||
         !rts_semaphore_current_can_block(kernel))
     {

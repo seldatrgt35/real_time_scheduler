@@ -50,6 +50,10 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     {
         return RTS_STATUS_INVALID_STATE;
     }
+    if (rts_scheduler_task_is_timer_service(kernel->current_task))
+    {
+        return RTS_STATUS_INVALID_CONTEXT;
+    }
 
     critical_token = rts_port_critical_enter();
     if (kernel->lifecycle != RTS_KERNEL_RUNNING)

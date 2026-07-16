@@ -5,6 +5,7 @@
 #include "rts/rts_mutex.h"
 #include "rts/rts_semaphore.h"
 #include "mutex_internal.h"
+#include "config_internal.h"
 #include "semaphore_internal.h"
 #include "scheduler_internal.h"
 #include "stack_check_internal.h"
@@ -33,6 +34,12 @@ static bool rts_task_membership_is_valid(const rts_kernel_state_t *kernel,
     if (task->state != RTS_TASK_STATE_BLOCKED || ready)
     {
         return false;
+    }
+    if (task->wait.reason == RTS_WAIT_TIMER_SERVICE)
+    {
+        return rts_scheduler_task_is_timer_service(task) && !delayed &&
+               !waiting && task->wait.object == NULL &&
+               !task->wait.timeout_active;
     }
     if (task->wait.reason == RTS_WAIT_DELAY)
     {
@@ -101,7 +108,7 @@ static bool rts_ready_structure_is_valid(const rts_kernel_state_t *kernel)
         bool bit = (kernel->ready_set.ready_bitmap[priority / 32u] &
                     (UINT32_C(1) << (priority % 32u))) != 0u;
 
-        while (node != NULL && count <= (size_t)RTS_MAX_TASKS)
+        while (node != NULL && count <= RTS_SCHEDULABLE_TASK_CAPACITY)
         {
             const rts_tcb_t *task = node->object;
             if (node->owner != list || node->previous != previous ||
@@ -135,16 +142,27 @@ bool rts_scheduler_validate_internal(void)
     if (kernel->lifecycle == RTS_KERNEL_RESET)
     {
         return kernel->current_task == NULL && kernel->idle_task == NULL &&
+               kernel->timer_service_task == NULL &&
                kernel->application_task_pool.allocated_count == 0u;
     }
 
     if (!rts_ready_structure_is_valid(kernel) || kernel->idle_task == NULL ||
         kernel->idle_task != &kernel->idle_task_storage ||
-        !rts_task_validate_internal(kernel->idle_task))
+        !rts_task_validate_internal(kernel->idle_task) ||
+        kernel->timer_service_task !=
+            &kernel->timer_service_task_storage ||
+        !rts_task_validate_internal(kernel->timer_service_task))
     {
         return false;
     }
-    while (node != NULL && count <= (size_t)RTS_MAX_TASKS)
+    if ((kernel->timer_service_task->state == RTS_TASK_STATE_BLOCKED &&
+         rts_timer_manager_get()->callback_queue.count != 0u) ||
+        (kernel->timer_service_task->state == RTS_TASK_STATE_READY &&
+         rts_timer_manager_get()->callback_queue.count == 0u))
+    {
+        return false;
+    }
+    while (node != NULL && count <= RTS_SCHEDULABLE_TASK_CAPACITY)
     {
         const rts_tcb_t *task = node->object;
         if (task == NULL || &task->delay_node != node ||
@@ -198,6 +216,11 @@ bool rts_sync_validate_internal(void)
     const rts_kernel_state_t *kernel = rts_kernel_state_get();
     size_t index;
 
+    if (kernel->lifecycle == RTS_KERNEL_RESET)
+    {
+        return true;
+    }
+
     for (index = 0u; index < (size_t)RTS_MAX_TASKS; ++index)
     {
         const rts_tcb_t *task = &kernel->application_task_pool.slots[index];
@@ -227,13 +250,47 @@ bool rts_sync_validate_internal(void)
                 if (owner == NULL || owner == task ||
                     (!rts_task_handle_is_application_task(
                          (rts_task_handle_t)owner) &&
-                     owner != kernel->idle_task) ||
-                    ++chain_depth > (size_t)RTS_MAX_TASKS)
+                     owner != kernel->idle_task &&
+                     owner != kernel->timer_service_task) ||
+                    ++chain_depth > RTS_SCHEDULABLE_TASK_CAPACITY)
                 {
                     return false;
                 }
                 cursor = owner;
             }
+        }
+        required = task->base_priority;
+        mutex = task->owned_mutex_head;
+        while (mutex != NULL &&
+               owned < (size_t)RTS_MAX_MUTEXES_PER_TASK)
+        {
+            if (!rts_mutex_is_valid(mutex) || mutex->owner != task)
+            {
+                return false;
+            }
+            if (mutex->waiters.head != NULL &&
+                mutex->waiters.head->priority > required)
+            {
+                required = mutex->waiters.head->priority;
+            }
+            mutex = mutex->owned_next;
+            ++owned;
+        }
+        if (mutex != NULL || owned != task->owned_mutex_count ||
+            required != task->priority)
+        {
+            return false;
+        }
+    }
+    {
+        const rts_tcb_t *task = kernel->timer_service_task;
+        const rts_mutex_t *mutex;
+        rts_priority_t required;
+        size_t owned = 0u;
+
+        if (task == NULL)
+        {
+            return false;
         }
         required = task->base_priority;
         mutex = task->owned_mutex_head;

@@ -42,9 +42,10 @@ bool rts_mutex_timeout_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
     return false;
 }
 
-void rts_timer_manager_process_expired(rts_tick_t now)
+bool rts_timer_manager_process_expired(rts_tick_t now)
 {
     (void)now;
+    return false;
 }
 static bool test_in_isr;
 static unsigned int switch_request_count;

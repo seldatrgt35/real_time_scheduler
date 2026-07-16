@@ -8,6 +8,7 @@
 #include "rts/rts.h"
 #include "rts/rts_task.h"
 #include "rts/rts_semaphore.h"
+#include "rts/rts_timer.h"
 #include "target.h"
 #include "target_diagnostics.h"
 #include "target_tick.h"
@@ -42,9 +43,45 @@ RTS_TASK_STACK_DECLARE(g_task_c_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 
 rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
 static rts_semaphore_t g_smoke_semaphore;
+static rts_semaphore_t g_timer_semaphore;
 static rts_mutex_t g_smoke_mutex;
 static bool g_low_mutex_locked;
 static rts_tick_t g_low_mutex_lock_tick;
+static rts_timer_handle_t g_periodic_timer;
+static rts_timer_handle_t g_one_shot_timer;
+
+static void rts_smoke_timer_context_record(void)
+{
+    rts_tcb_t *current = rts_scheduler_current_get();
+
+    g_rts_s32k148_smoke_record.timer_callback_psp = __get_PSP();
+    g_rts_s32k148_smoke_record.timer_callback_ipsr = __get_IPSR();
+    g_rts_s32k148_smoke_record.timer_service_identity_valid =
+        rts_scheduler_task_is_timer_service(current) ? 1u : 0u;
+    if (__get_IPSR() != 0u ||
+        !rts_scheduler_task_is_timer_service(current))
+    {
+        g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_TIMER;
+    }
+}
+
+static void rts_smoke_periodic_timer_callback(void *argument)
+{
+    (void)argument;
+    rts_smoke_timer_context_record();
+    ++g_rts_s32k148_smoke_record.timer_periodic_callback_count;
+}
+
+static void rts_smoke_one_shot_timer_callback(void *argument)
+{
+    (void)argument;
+    rts_smoke_timer_context_record();
+    ++g_rts_s32k148_smoke_record.timer_one_shot_callback_count;
+    if (rts_semaphore_give(&g_timer_semaphore) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_TIMER;
+    }
+}
 
 bool rts_s32k148_tick_isr_hook(void)
 {
@@ -192,7 +229,10 @@ static void rts_smoke_task(void *argument)
             RTS_SMOKE_FAILURE_HANDLER_STACK;
     }
 
-    if (task == &g_task_c_argument && rts_task_delay(10u) != RTS_STATUS_OK)
+    if (task == &g_task_c_argument &&
+        (rts_task_delay(10u) != RTS_STATUS_OK ||
+         rts_semaphore_take(&g_timer_semaphore, RTS_WAIT_FOREVER) !=
+             RTS_STATUS_OK))
     {
         g_rts_s32k148_smoke_record.failure_flags |=
             RTS_SMOKE_FAILURE_SEMAPHORE;
@@ -278,6 +318,20 @@ static void rts_smoke_task(void *argument)
             {
                 g_rts_s32k148_smoke_record.failure_flags |=
                     RTS_SMOKE_FAILURE_SEMAPHORE;
+            }
+        }
+        if (task == &g_task_c_argument &&
+            ((*task->counter) & UINT32_C(0x3fff)) == 0u)
+        {
+            if (rts_timer_stop(g_periodic_timer) != RTS_STATUS_OK ||
+                rts_timer_restart(g_periodic_timer) != RTS_STATUS_OK)
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_TIMER;
+            }
+            else
+            {
+                ++g_rts_s32k148_smoke_record.timer_stop_restart_count;
             }
         }
         if (task == &g_task_b_argument && g_low_mutex_locked &&
@@ -391,6 +445,18 @@ int main(void)
         .stack_size_bytes = sizeof(g_task_c_stack),
         .priority = 2u
     };
+    const rts_timer_config_t periodic_timer_config = {
+        .period = 25u,
+        .callback = rts_smoke_periodic_timer_callback,
+        .argument = NULL,
+        .mode = RTS_TIMER_PERIODIC
+    };
+    const rts_timer_config_t one_shot_timer_config = {
+        .period = 40u,
+        .callback = rts_smoke_one_shot_timer_callback,
+        .argument = NULL,
+        .mode = RTS_TIMER_ONE_SHOT
+    };
 
     rts_s32k148_timing_initialize();
     rts_smoke_guard_initialize(g_task_a_stack);
@@ -400,6 +466,12 @@ int main(void)
     {
         g_rts_s32k148_smoke_record.failure_flags |=
             RTS_SMOKE_FAILURE_SEMAPHORE;
+        return 1;
+    }
+    if (rts_semaphore_init(&g_timer_semaphore, 0u, 1u) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |=
+            RTS_SMOKE_FAILURE_TIMER;
         return 1;
     }
     if (rts_mutex_init(&g_smoke_mutex) != RTS_STATUS_OK)
@@ -431,13 +503,23 @@ int main(void)
             RTS_SMOKE_FAILURE_CREATE_C;
         return 4;
     }
+    if (rts_timer_init(&periodic_timer_config, &g_periodic_timer) !=
+            RTS_STATUS_OK ||
+        rts_timer_init(&one_shot_timer_config, &g_one_shot_timer) !=
+            RTS_STATUS_OK ||
+        rts_timer_start(g_periodic_timer) != RTS_STATUS_OK ||
+        rts_timer_start(g_one_shot_timer) != RTS_STATUS_OK)
+    {
+        g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_TIMER;
+        return 5;
+    }
     if (rts_start() != RTS_STATUS_OK)
     {
         g_rts_s32k148_smoke_record.failure_flags |=
             RTS_SMOKE_FAILURE_START_RETURNED;
-        return 5;
+        return 6;
     }
     g_rts_s32k148_smoke_record.failure_flags |=
         RTS_SMOKE_FAILURE_START_RETURNED;
-    return 6;
+    return 7;
 }

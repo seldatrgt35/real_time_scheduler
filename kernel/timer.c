@@ -1,6 +1,7 @@
 #include "rts/rts_timer.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "assert_internal.h"
 #include "diagnostics_internal.h"
@@ -14,25 +15,13 @@ static rts_timer_manager_t rts_timer_manager;
 
 static void rts_timer_object_reset(struct rts_timer *timer, size_t slot_index)
 {
-    timer->expiration_tick = 0u;
-    timer->last_expiration_tick = 0u;
-    timer->period = 0u;
-    timer->callback = NULL;
-    timer->argument = NULL;
+    *timer = (struct rts_timer){0};
     rts_list_node_initialize(&timer->queue_node);
     timer->slot_index = slot_index;
     timer->mode = RTS_TIMER_ONE_SHOT;
     timer->state = RTS_TIMER_UNINITIALIZED;
+    timer->callback_state = RTS_TIMER_CALLBACK_IDLE;
     timer->slot_state = RTS_TIMER_SLOT_FREE;
-#if RTS_ENABLE_RUNTIME_STATS
-    timer->diagnostic_start_count = 0u;
-    timer->diagnostic_stop_count = 0u;
-    timer->diagnostic_restart_count = 0u;
-    timer->diagnostic_expiration_count = 0u;
-#endif
-#if RTS_ENABLE_ASSERTIONS
-    timer->validation_magic = 0u;
-#endif
 }
 
 void rts_timer_manager_initialize(void)
@@ -44,7 +33,8 @@ void rts_timer_manager_initialize(void)
     {
         rts_timer_object_reset(&manager->slots[index], index);
     }
-    rts_timer_queue_initialize(&manager->running_queue);
+    rts_timer_queue_initialize(&manager->active_queue);
+    rts_timer_callback_queue_initialize(&manager->callback_queue);
     manager->allocated_count = 0u;
     manager->next_free_hint = 0u;
 }
@@ -62,11 +52,6 @@ static struct rts_timer *rts_timer_reserve(rts_timer_manager_t *manager)
         manager->next_free_hint >= (size_t)RTS_MAX_TIMERS)
     {
         RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
-    }
-    if (manager == NULL ||
-        manager->next_free_hint >= (size_t)RTS_MAX_TIMERS)
-    {
-        return NULL;
     }
     for (examined = 0u; examined < (size_t)RTS_MAX_TIMERS; ++examined)
     {
@@ -109,7 +94,6 @@ static bool rts_timer_lifecycle_allows_control(
 
 static struct rts_timer *rts_timer_resolve(rts_timer_handle_t handle)
 {
-    rts_timer_manager_t *manager = &rts_timer_manager;
     size_t index;
 
     if (handle == NULL)
@@ -118,11 +102,11 @@ static struct rts_timer *rts_timer_resolve(rts_timer_handle_t handle)
     }
     for (index = 0u; index < (size_t)RTS_MAX_TIMERS; ++index)
     {
-        if (handle == &manager->slots[index])
+        if (handle == &rts_timer_manager.slots[index])
         {
-            return manager->slots[index].slot_state ==
+            return rts_timer_manager.slots[index].slot_state ==
                            RTS_TIMER_SLOT_ALLOCATED
-                       ? &manager->slots[index]
+                       ? &rts_timer_manager.slots[index]
                        : NULL;
         }
     }
@@ -151,11 +135,8 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
     {
         *out_handle = NULL;
     }
-    if (config == NULL || out_handle == NULL)
-    {
-        return RTS_STATUS_INVALID_ARGUMENT;
-    }
-    if (!rts_timer_config_is_valid(config))
+    if (config == NULL || out_handle == NULL ||
+        !rts_timer_config_is_valid(config))
     {
         return RTS_STATUS_INVALID_ARGUMENT;
     }
@@ -180,21 +161,13 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
         rts_port_critical_exit(token);
         return RTS_STATUS_CAPACITY_EXHAUSTED;
     }
-    timer->expiration_tick = 0u;
-    timer->last_expiration_tick = 0u;
     timer->period = config->period;
     timer->callback = config->callback;
     timer->argument = config->argument;
-    rts_list_node_initialize(&timer->queue_node);
     timer->mode = config->mode;
     timer->state = RTS_TIMER_STOPPED;
-#if RTS_ENABLE_RUNTIME_STATS
-    timer->diagnostic_start_count = 0u;
-    timer->diagnostic_stop_count = 0u;
-    timer->diagnostic_restart_count = 0u;
-    timer->diagnostic_expiration_count = 0u;
-    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_initializations);
-#endif
+    timer->callback_state = RTS_TIMER_CALLBACK_IDLE;
+    timer->generation = UINT32_C(1);
 #if RTS_ENABLE_ASSERTIONS
     timer->validation_magic = RTS_TIMER_VALIDATION_MAGIC;
 #endif
@@ -205,13 +178,43 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
     timer->slot_state = RTS_TIMER_SLOT_ALLOCATED;
     ++manager->allocated_count;
     *out_handle = timer;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_initializations);
+#endif
     RTS_TRACE(RTS_TRACE_TIMER_INITIALIZED, timer->slot_index, timer->mode);
-    if (!rts_timer_manager_validate(manager))
-    {
-        RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
-    }
+    RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
     rts_port_critical_exit(token);
     return RTS_STATUS_OK;
+}
+
+static size_t rts_timer_invalidate_pending(rts_timer_manager_t *manager,
+                                           struct rts_timer *timer)
+{
+    size_t removed = rts_timer_callback_queue_remove_timer(
+        &manager->callback_queue, timer);
+
+    if (timer->callback_state == RTS_TIMER_CALLBACK_PENDING)
+    {
+        RTS_FATAL_UNLESS(removed == 1u);
+        timer->callback_state = RTS_TIMER_CALLBACK_IDLE;
+    }
+    else
+    {
+        RTS_FATAL_UNLESS(removed == 0u);
+    }
+    if (manager->callback_queue.count == 0u)
+    {
+        rts_scheduler_timer_service_cancel_wake();
+    }
+#if RTS_ENABLE_RUNTIME_STATS
+    timer->diagnostic_stale_count = rts_diagnostic_counter_add(
+        timer->diagnostic_stale_count, (uint32_t)removed);
+    rts_kernel_state_get()->runtime_counters.timer_stale_callbacks =
+        rts_diagnostic_counter_add(
+            rts_kernel_state_get()->runtime_counters.timer_stale_callbacks,
+            (uint32_t)removed);
+#endif
+    return removed;
 }
 
 static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
@@ -237,25 +240,28 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
         return timer == NULL ? RTS_STATUS_INVALID_ARGUMENT
                              : RTS_STATUS_INVALID_STATE;
     }
-    if (!restart && timer->state == RTS_TIMER_RUNNING)
+    if (!restart)
     {
-        rts_port_critical_exit(token);
-        return RTS_STATUS_INVALID_STATE;
+        if (timer->state != RTS_TIMER_STOPPED ||
+            timer->callback_state != RTS_TIMER_CALLBACK_IDLE)
+        {
+            rts_port_critical_exit(token);
+            return RTS_STATUS_INVALID_STATE;
+        }
     }
-    if (restart && timer->state == RTS_TIMER_RUNNING)
+    else
     {
-        rts_timer_queue_remove(&manager->running_queue, timer);
-    }
-    else if (timer->state != RTS_TIMER_STOPPED &&
-             timer->state != RTS_TIMER_EXPIRED)
-    {
-        rts_port_critical_exit(token);
-        return RTS_STATUS_INVALID_STATE;
+        if (timer->state == RTS_TIMER_ACTIVE)
+        {
+            rts_timer_queue_remove(&manager->active_queue, timer);
+        }
+        ++timer->generation;
+        (void)rts_timer_invalidate_pending(manager, timer);
     }
 
     timer->expiration_tick = kernel->current_tick + timer->period;
-    timer->state = RTS_TIMER_RUNNING;
-    rts_timer_queue_insert(&manager->running_queue, timer);
+    timer->state = RTS_TIMER_ACTIVE;
+    rts_timer_queue_insert(&manager->active_queue, timer);
 #if RTS_ENABLE_RUNTIME_STATS
     if (restart)
     {
@@ -270,10 +276,7 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
 #endif
     RTS_TRACE(restart ? RTS_TRACE_TIMER_RESTARTED : RTS_TRACE_TIMER_STARTED,
               timer->slot_index, timer->expiration_tick);
-    if (!rts_timer_manager_validate(manager))
-    {
-        RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
-    }
+    RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
     rts_port_critical_exit(token);
     return RTS_STATUS_OK;
 }
@@ -294,6 +297,7 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
     rts_timer_manager_t *manager = &rts_timer_manager;
     rts_critical_token_t token;
     struct rts_timer *timer;
+    bool had_effect;
 
     if (rts_port_is_in_isr())
     {
@@ -311,22 +315,26 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
         return timer == NULL ? RTS_STATUS_INVALID_ARGUMENT
                              : RTS_STATUS_INVALID_STATE;
     }
-    if (timer->state != RTS_TIMER_RUNNING)
+    had_effect = timer->state == RTS_TIMER_ACTIVE ||
+                 timer->callback_state != RTS_TIMER_CALLBACK_IDLE;
+    if (!had_effect)
     {
         rts_port_critical_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
-    rts_timer_queue_remove(&manager->running_queue, timer);
+    if (timer->state == RTS_TIMER_ACTIVE)
+    {
+        rts_timer_queue_remove(&manager->active_queue, timer);
+    }
     timer->state = RTS_TIMER_STOPPED;
+    ++timer->generation;
+    (void)rts_timer_invalidate_pending(manager, timer);
 #if RTS_ENABLE_RUNTIME_STATS
     RTS_DIAG_COUNTER_INC(timer->diagnostic_stop_count);
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_stops);
 #endif
-    RTS_TRACE(RTS_TRACE_TIMER_STOPPED, timer->slot_index, 0u);
-    if (!rts_timer_manager_validate(manager))
-    {
-        RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
-    }
+    RTS_TRACE(RTS_TRACE_TIMER_STOPPED, timer->slot_index, timer->generation);
+    RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
     rts_port_critical_exit(token);
     return RTS_STATUS_OK;
 }
@@ -335,7 +343,7 @@ bool rts_timer_is_running(rts_timer_handle_t handle)
 {
     rts_critical_token_t token;
     struct rts_timer *timer;
-    bool running;
+    bool active;
 
     if (rts_port_is_in_isr())
     {
@@ -343,47 +351,116 @@ bool rts_timer_is_running(rts_timer_handle_t handle)
     }
     token = rts_port_critical_enter();
     timer = rts_timer_resolve(handle);
-    running = timer != NULL && timer->state == RTS_TIMER_RUNNING &&
-              rts_timer_queue_contains(
-                  &rts_timer_manager.running_queue,
-                  timer);
+    active = timer != NULL && timer->state == RTS_TIMER_ACTIVE &&
+             rts_timer_queue_contains(&rts_timer_manager.active_queue,
+                                      timer);
     rts_port_critical_exit(token);
-    return running;
+    return active;
 }
 
-void rts_timer_manager_process_expired(rts_tick_t now)
+static rts_tick_t rts_timer_periodic_next(struct rts_timer *timer,
+                                          rts_tick_t now,
+                                          uint32_t *missed)
+{
+    rts_tick_t lateness = now - timer->expiration_tick;
+    rts_tick_t skipped = lateness / timer->period;
+    rts_tick_t periods = skipped + 1u;
+
+    *missed = skipped;
+    return timer->expiration_tick + periods * timer->period;
+}
+
+bool rts_timer_manager_process_expired(rts_tick_t now)
 {
     rts_timer_manager_t *manager = &rts_timer_manager;
     struct rts_timer *timer;
+    bool service_woken = false;
 #if RTS_ENABLE_RUNTIME_STATS
     rts_kernel_state_t *kernel = rts_kernel_state_get();
 #endif
 
     for (;;)
     {
-        timer = rts_timer_queue_peek_expired(&manager->running_queue, now);
+        rts_timer_callback_work_t work;
+        rts_tick_t consumed_deadline;
+        uint32_t missed = 0u;
+
+        timer = rts_timer_queue_peek_expired(&manager->active_queue, now);
         if (timer == NULL)
         {
             break;
         }
-        rts_timer_queue_remove(&manager->running_queue, timer);
-        timer->last_expiration_tick = timer->expiration_tick;
+        consumed_deadline = timer->expiration_tick;
+        rts_timer_queue_remove(&manager->active_queue, timer);
+        timer->last_expiration_tick = consumed_deadline;
         if (timer->mode == RTS_TIMER_PERIODIC)
         {
-            timer->expiration_tick += timer->period;
+            timer->expiration_tick =
+                rts_timer_periodic_next(timer, now, &missed);
+            timer->state = RTS_TIMER_ACTIVE;
+            rts_timer_queue_insert(&manager->active_queue, timer);
         }
-        timer->state = RTS_TIMER_EXPIRED;
+        else
+        {
+            timer->state = RTS_TIMER_STOPPED;
+        }
+
 #if RTS_ENABLE_RUNTIME_STATS
         RTS_DIAG_COUNTER_INC(timer->diagnostic_expiration_count);
         RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_expirations);
+        timer->diagnostic_missed_period_count = rts_diagnostic_counter_add(
+            timer->diagnostic_missed_period_count, missed);
+        kernel->runtime_counters.timer_missed_periods =
+            rts_diagnostic_counter_add(
+                kernel->runtime_counters.timer_missed_periods, missed);
 #endif
         RTS_TRACE(RTS_TRACE_TIMER_EXPIRED, timer->slot_index,
-                  timer->last_expiration_tick);
+                  consumed_deadline);
+
+        if (timer->callback_state != RTS_TIMER_CALLBACK_IDLE)
+        {
+#if RTS_ENABLE_RUNTIME_STATS
+            RTS_DIAG_COUNTER_INC(timer->diagnostic_overrun_count);
+            RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_overruns);
+            RTS_DIAG_COUNTER_INC(timer->diagnostic_missed_period_count);
+            RTS_DIAG_COUNTER_INC(kernel->runtime_counters.timer_missed_periods);
+#endif
+            RTS_TRACE(RTS_TRACE_TIMER_OVERRUN, timer->slot_index,
+                      consumed_deadline);
+            continue;
+        }
+
+        ++timer->expiration_sequence;
+        work.timer = timer;
+        work.expiration_tick = consumed_deadline;
+        work.generation = timer->generation;
+        work.sequence = timer->expiration_sequence;
+        if (!rts_timer_callback_queue_enqueue(&manager->callback_queue,
+                                              &work))
+        {
+#if RTS_ENABLE_RUNTIME_STATS
+            RTS_DIAG_COUNTER_INC(
+                kernel->runtime_counters.timer_callback_queue_overflows);
+#endif
+            RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CALLBACK_QUEUE_OVERFLOW,
+                             manager);
+        }
+        timer->callback_state = RTS_TIMER_CALLBACK_PENDING;
+#if RTS_ENABLE_RUNTIME_STATS
+        if ((uint32_t)manager->callback_queue.maximum_depth >
+            kernel->runtime_counters.timer_callback_queue_maximum_depth)
+        {
+            kernel->runtime_counters.timer_callback_queue_maximum_depth =
+                (uint32_t)manager->callback_queue.maximum_depth;
+        }
+#endif
+        if (rts_scheduler_timer_service_wake())
+        {
+            service_woken = true;
+        }
     }
-    if (!rts_timer_manager_validate(manager))
-    {
-        RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
-    }
+    RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
+    return service_woken;
 }
 
 bool rts_timer_manager_validate(const rts_timer_manager_t *manager)
@@ -395,18 +472,61 @@ bool rts_timer_manager_validate(const rts_timer_manager_t *manager)
     if (manager == NULL ||
         manager->next_free_hint >= (size_t)RTS_MAX_TIMERS ||
         manager->allocated_count > (size_t)RTS_MAX_TIMERS ||
-        !rts_timer_queue_validate(&manager->running_queue))
+        !rts_timer_queue_validate(&manager->active_queue) ||
+        !rts_timer_callback_queue_validate(&manager->callback_queue))
     {
         return false;
+    }
+    {
+        size_t queue_index = manager->callback_queue.head;
+        size_t work_index;
+
+        for (work_index = 0u;
+             work_index < manager->callback_queue.count; ++work_index)
+        {
+            const rts_timer_callback_work_t *work =
+                &manager->callback_queue.items[queue_index];
+            bool owned = false;
+            size_t slot_index;
+
+            for (slot_index = 0u; slot_index < (size_t)RTS_MAX_TIMERS;
+                 ++slot_index)
+            {
+                if (work->timer == &manager->slots[slot_index])
+                {
+                    owned = true;
+                    break;
+                }
+            }
+            if (!owned || work->timer->slot_state !=
+                              RTS_TIMER_SLOT_ALLOCATED ||
+                work->timer->callback_state != RTS_TIMER_CALLBACK_PENDING ||
+                work->generation != work->timer->generation ||
+                rts_timer_callback_queue_count_for(
+                    &manager->callback_queue, work->timer) != 1u)
+            {
+                return false;
+            }
+            ++queue_index;
+            if (queue_index ==
+                (size_t)RTS_TIMER_CALLBACK_QUEUE_CAPACITY)
+            {
+                queue_index = 0u;
+            }
+        }
     }
     for (index = 0u; index < (size_t)RTS_MAX_TIMERS; ++index)
     {
         const struct rts_timer *timer = &manager->slots[index];
-        bool linked = rts_timer_queue_contains(&manager->running_queue, timer);
+        bool linked = rts_timer_queue_contains(&manager->active_queue,
+                                               timer);
+        size_t pending = rts_timer_callback_queue_count_for(
+            &manager->callback_queue, timer);
 
         if (timer->slot_state == RTS_TIMER_SLOT_FREE)
         {
-            if (timer->state != RTS_TIMER_UNINITIALIZED || linked)
+            if (timer->state != RTS_TIMER_UNINITIALIZED || linked ||
+                pending != 0u)
             {
                 return false;
             }
@@ -414,7 +534,7 @@ bool rts_timer_manager_validate(const rts_timer_manager_t *manager)
         }
         if (timer->slot_state == RTS_TIMER_SLOT_RESERVED)
         {
-            if (linked)
+            if (linked || pending != 0u)
             {
                 return false;
             }
@@ -425,8 +545,13 @@ bool rts_timer_manager_validate(const rts_timer_manager_t *manager)
             timer->period == 0u || timer->period > RTS_DELAY_MAX ||
             (timer->mode != RTS_TIMER_ONE_SHOT &&
              timer->mode != RTS_TIMER_PERIODIC) ||
-            timer->state == RTS_TIMER_UNINITIALIZED ||
-            linked != (timer->state == RTS_TIMER_RUNNING))
+            (timer->state != RTS_TIMER_STOPPED &&
+             timer->state != RTS_TIMER_ACTIVE) ||
+            linked != (timer->state == RTS_TIMER_ACTIVE) ||
+            pending !=
+                (timer->callback_state == RTS_TIMER_CALLBACK_PENDING ? 1u
+                                                                     : 0u) ||
+            timer->callback_state > RTS_TIMER_CALLBACK_RUNNING)
         {
             return false;
         }

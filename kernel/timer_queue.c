@@ -124,7 +124,7 @@ bool rts_timer_queue_validate(const rts_timer_queue_t *queue)
         if (node->owner != &queue->ordered_timers ||
             node->previous != previous_node || timer == NULL ||
             &timer->queue_node != node ||
-            timer->state != RTS_TIMER_RUNNING ||
+            timer->state != RTS_TIMER_ACTIVE ||
             (previous_timer != NULL &&
              rts_tick_before(timer->expiration_tick,
                              previous_timer->expiration_tick)))
