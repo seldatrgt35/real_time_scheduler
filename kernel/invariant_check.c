@@ -12,12 +12,13 @@
 #include "time_internal.h"
 #include "timer_internal.h"
 #include "wait_object_internal.h"
+#include "scheduler_policy.h"
 
 #if RTS_ENABLE_INVARIANT_CHECKS
 static bool rts_task_membership_is_valid(const rts_kernel_state_t *kernel,
                                          const rts_tcb_t *task)
 {
-    bool ready = rts_ready_contains(&kernel->ready_set, task);
+    bool ready = rts_policy_validate(task, true);
     bool delayed = rts_delay_contains(&kernel->delay_queue, task);
     bool waiting = task->wait_node.owner != NULL;
 
@@ -94,43 +95,6 @@ bool rts_task_validate_internal(const rts_tcb_t *task)
 #endif
 }
 
-#if RTS_ENABLE_INVARIANT_CHECKS
-static bool rts_ready_structure_is_valid(const rts_kernel_state_t *kernel)
-{
-    size_t priority;
-
-    for (priority = 0u; priority < (size_t)RTS_PRIORITY_COUNT; ++priority)
-    {
-        const rts_list_t *list = &kernel->ready_set.priority_queue[priority];
-        const rts_list_node_t *node = list->head;
-        const rts_list_node_t *previous = NULL;
-        size_t count = 0u;
-        bool bit = (kernel->ready_set.ready_bitmap[priority / 32u] &
-                    (UINT32_C(1) << (priority % 32u))) != 0u;
-
-        while (node != NULL && count <= RTS_SCHEDULABLE_TASK_CAPACITY)
-        {
-            const rts_tcb_t *task = node->object;
-            if (node->owner != list || node->previous != previous ||
-                task == NULL || &task->ready_node != node ||
-                (size_t)task->priority != priority)
-            {
-                return false;
-            }
-            previous = node;
-            node = node->next;
-            ++count;
-        }
-        if (node != NULL || previous != list->tail || count != list->count ||
-            bit != (count != 0u))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-#endif
-
 bool rts_scheduler_validate_internal(void)
 {
 #if RTS_ENABLE_INVARIANT_CHECKS
@@ -146,7 +110,7 @@ bool rts_scheduler_validate_internal(void)
                kernel->application_task_pool.allocated_count == 0u;
     }
 
-    if (!rts_ready_structure_is_valid(kernel) || kernel->idle_task == NULL ||
+    if (!rts_policy_validate(NULL, false) || kernel->idle_task == NULL ||
         kernel->idle_task != &kernel->idle_task_storage ||
         !rts_task_validate_internal(kernel->idle_task) ||
         kernel->timer_service_task !=

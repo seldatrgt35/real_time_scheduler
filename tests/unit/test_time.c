@@ -6,6 +6,7 @@
 #include "trace_internal.h"
 #include "diagnostics_internal.h"
 #include "time_internal.h"
+#include "scheduler_policy.h"
 
 static int test_failures;
 static unsigned int assertion_count;
@@ -102,6 +103,18 @@ void rts_ready_insert(rts_ready_set_t *ready_set, rts_tcb_t *task)
 {
     (void)ready_set;
     (void)task;
+}
+
+bool rts_policy_task_unblock(rts_tcb_t *task)
+{
+    rts_ready_insert(&test_kernel.ready_set, task);
+    return true;
+}
+
+bool rts_policy_tick(rts_tick_t elapsed_ticks)
+{
+    (void)elapsed_ticks;
+    return false;
 }
 
 bool rts_scheduler_task_is_runnable(const rts_tcb_t *task)

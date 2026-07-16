@@ -2,6 +2,7 @@
 
 #include "assert_internal.h"
 #include "scheduler_internal.h"
+#include "scheduler_policy.h"
 
 bool rts_task_handle_is_application_task(rts_task_handle_t handle)
 {
@@ -26,7 +27,6 @@ bool rts_task_handle_is_application_task(rts_task_handle_t handle)
 
 bool rts_task_object_is_valid(const rts_tcb_t *task)
 {
-    const rts_kernel_state_t *kernel = rts_kernel_state_get();
     bool valid;
 
     if (!rts_task_handle_is_application_task((rts_task_handle_t)task))
@@ -51,7 +51,7 @@ bool rts_task_object_is_valid(const rts_tcb_t *task)
 #endif
     if (valid)
     {
-        valid = rts_ready_contains(&kernel->ready_set, task);
+        valid = rts_policy_validate(task, true);
     }
     return valid;
 }

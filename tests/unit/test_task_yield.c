@@ -43,7 +43,16 @@ static void reset_environment(void)
 static rts_task_handle_t create_task(void *stack, size_t size,
                                      rts_priority_t priority)
 {
-    rts_task_config_t config = {task_entry, NULL, stack, size, priority};
+    rts_task_config_t config = {
+        .entry = task_entry,
+        .argument = NULL,
+        .stack_buffer = stack,
+        .stack_size_bytes = size,
+        .priority = priority,
+        .period = 0u,
+        .relative_deadline = 0u,
+        .execution_budget = 0u
+    };
     rts_task_handle_t task = NULL;
 
     CHECK(rts_task_create(&config, &task) == RTS_STATUS_OK);

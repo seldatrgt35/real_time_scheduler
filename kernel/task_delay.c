@@ -8,6 +8,7 @@
 #include "time_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "scheduler_policy.h"
 
 static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -16,7 +17,7 @@ static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            !rts_scheduler_task_is_idle(current) &&
            rts_scheduler_current_is_valid() &&
-           rts_ready_is_front(&kernel->ready_set, current) &&
+           rts_policy_validate(current, true) &&
            current->wait.reason == RTS_WAIT_NONE &&
            current->wait.result == RTS_WAIT_RESULT_NONE &&
            current->wait.object == NULL && !current->wait.timeout_active &&
@@ -72,8 +73,8 @@ rts_status_t rts_task_delay(rts_tick_t delay)
 
     current = kernel->current_task;
     current->wait.wake_tick = kernel->current_tick + delay;
-    rts_ready_remove(&kernel->ready_set, current);
-    RTS_FATAL_UNLESS(!rts_ready_contains(&kernel->ready_set, current));
+    RTS_FATAL_UNLESS(rts_policy_task_block(current));
+    RTS_FATAL_UNLESS(rts_policy_validate(current, false));
 
     current->wait.reason = RTS_WAIT_DELAY;
     current->wait.result = RTS_WAIT_RESULT_NONE;

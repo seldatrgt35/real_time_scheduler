@@ -69,6 +69,30 @@ rts_status_t rts_task_config_validate(const rts_task_config_t *config,
         return RTS_STATUS_INVALID_PRIORITY;
     }
 
+#if RTS_POLICY_RMS
+    if (config->period == 0u || config->period > RTS_DELAY_MAX ||
+        config->relative_deadline == 0u ||
+        config->relative_deadline > config->period ||
+        config->execution_budget > config->relative_deadline)
+    {
+        return RTS_STATUS_INVALID_TASK_CONFIG;
+    }
+#elif RTS_POLICY_EDF
+    if (config->relative_deadline == 0u ||
+        config->relative_deadline > RTS_DELAY_MAX ||
+        config->period > RTS_DELAY_MAX ||
+        config->execution_budget > config->relative_deadline)
+    {
+        return RTS_STATUS_INVALID_TASK_CONFIG;
+    }
+#else
+    if (config->period > RTS_DELAY_MAX ||
+        config->relative_deadline > RTS_DELAY_MAX)
+    {
+        return RTS_STATUS_INVALID_TASK_CONFIG;
+    }
+#endif
+
     if (!rts_task_stack_is_valid(config))
     {
         return RTS_STATUS_INVALID_STACK;

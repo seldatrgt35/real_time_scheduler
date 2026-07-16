@@ -10,8 +10,8 @@
 #define RTS_TICK_RATE_HZ              1000u
 #define RTS_ENABLE_TICKLESS_IDLE      1
 #define RTS_TICKLESS_MAX_SLEEP_TICKS  60000u
-#define RTS_POLICY_FIXED_PRIORITY     1
-#define RTS_POLICY_RMS                0
+#define RTS_POLICY_FIXED_PRIORITY     0
+#define RTS_POLICY_RMS                1
 #define RTS_POLICY_EDF                0
 #define RTS_ENABLE_TIME_SLICING       1
 #define RTS_TIME_SLICE_TICKS          10u

@@ -36,7 +36,7 @@ static void reset_environment(void)
 static rts_task_handle_t create_task(void *stack, rts_priority_t priority)
 {
     rts_task_config_t config = {
-        task_entry, NULL, stack, TEST_STACK_BYTES, priority
+        task_entry, NULL, stack, TEST_STACK_BYTES, priority, 0u, 0u, 0u
     };
     rts_task_handle_t task = NULL;
 

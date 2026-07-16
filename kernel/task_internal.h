@@ -80,7 +80,14 @@ struct rts_task
     struct rts_mutex *owned_mutex_tail;
     size_t owned_mutex_count;
     rts_priority_t base_priority;
+    /* Effective priority used by FP/RMS and synchronization inheritance. */
     rts_priority_t priority;
+    rts_tick_t period;
+    rts_tick_t relative_deadline;
+    rts_tick_t absolute_deadline;
+    rts_tick_t release_tick;
+    rts_tick_t execution_budget;
+    uint32_t release_sequence;
     rts_task_state_t state;
     rts_task_slot_state_t slot_state;
 

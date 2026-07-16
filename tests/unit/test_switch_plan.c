@@ -50,13 +50,13 @@ static switch_fixture_t fixture_create(void)
         unsigned char c_stack[TEST_STACK_BYTES];
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_task_config_t a_config = {
-        task_entry, NULL, a_stack, sizeof a_stack, 2u
+        task_entry, NULL, a_stack, sizeof a_stack, 2u, 0u, 0u, 0u
     };
     rts_task_config_t b_config = {
-        task_entry, NULL, b_stack, sizeof b_stack, 5u
+        task_entry, NULL, b_stack, sizeof b_stack, 5u, 0u, 0u, 0u
     };
     rts_task_config_t c_config = {
-        task_entry, NULL, c_stack, sizeof c_stack, 7u
+        task_entry, NULL, c_stack, sizeof c_stack, 7u, 0u, 0u, 0u
     };
     switch_fixture_t fixture = {NULL, NULL, NULL};
 

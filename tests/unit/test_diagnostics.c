@@ -57,7 +57,8 @@ static void reset_environment(void)
 static rts_task_handle_t create_task(size_t index)
 {
     rts_task_config_t config = {
-        task_entry, NULL, test_stacks[index], sizeof test_stacks[index], 4u
+        task_entry, NULL, test_stacks[index], sizeof test_stacks[index], 4u,
+        0u, 0u, 0u
     };
     rts_task_handle_t task = NULL;
 

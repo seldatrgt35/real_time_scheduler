@@ -31,7 +31,7 @@ static void task_entry(void *argument)
 static rts_task_handle_t create_task(void *stack)
 {
     rts_task_config_t config = {
-        task_entry, NULL, stack, TEST_STACK_BYTES, 5u
+        task_entry, NULL, stack, TEST_STACK_BYTES, 5u, 0u, 0u, 0u
     };
     rts_task_handle_t task = NULL;
 

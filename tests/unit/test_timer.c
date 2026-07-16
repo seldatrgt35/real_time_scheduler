@@ -456,10 +456,11 @@ static void test_simultaneous_delay_timer_preemption(void)
         unsigned char low_stack[512u];
     const rts_task_config_t high_config = {
         dummy_task_entry, NULL, high_stack, sizeof(high_stack),
-        (rts_priority_t)(RTS_TIMER_SERVICE_PRIORITY + 1u)
+        (rts_priority_t)(RTS_TIMER_SERVICE_PRIORITY + 1u), 0u, 0u, 0u
     };
     const rts_task_config_t low_config = {
-        dummy_task_entry, NULL, low_stack, sizeof(low_stack), 1u
+        dummy_task_entry, NULL, low_stack, sizeof(low_stack), 1u,
+        0u, 0u, 0u
     };
     rts_task_handle_t high = NULL;
     rts_task_handle_t low = NULL;

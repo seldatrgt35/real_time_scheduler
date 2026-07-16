@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "assert_internal.h"
+#include "config_internal.h"
 
 #define RTS_READY_REQUIRE_VOID(condition)     \
     do                                        \
@@ -246,4 +247,45 @@ void rts_ready_rotate(rts_ready_set_t *ready_set,
     RTS_READY_REQUIRE_VOID(front->owner == NULL);
     rts_list_push_back(queue, front);
     RTS_READY_REQUIRE_VOID(front->owner == queue);
+}
+
+bool rts_ready_validate(const rts_ready_set_t *ready_set)
+{
+    size_t priority;
+
+    if (ready_set == NULL)
+    {
+        return false;
+    }
+    for (priority = 0u; priority < (size_t)RTS_PRIORITY_COUNT; ++priority)
+    {
+        const rts_list_t *queue = &ready_set->priority_queue[priority];
+        const rts_list_node_t *node = queue->head;
+        const rts_list_node_t *previous = NULL;
+        size_t count = 0u;
+        const bool bit =
+            (ready_set->ready_bitmap[priority / RTS_READY_BITMAP_WORD_BITS] &
+             (UINT32_C(1) << (priority % RTS_READY_BITMAP_WORD_BITS))) != 0u;
+
+        while (node != NULL && count <= RTS_SCHEDULABLE_TASK_CAPACITY)
+        {
+            const rts_tcb_t *task = node->object;
+
+            if (node->owner != queue || node->previous != previous ||
+                task == NULL || &task->ready_node != node ||
+                (size_t)task->priority != priority)
+            {
+                return false;
+            }
+            previous = node;
+            node = node->next;
+            ++count;
+        }
+        if (node != NULL || count != queue->count ||
+            previous != queue->tail || bit != (count != 0u))
+        {
+            return false;
+        }
+    }
+    return true;
 }

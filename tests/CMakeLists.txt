@@ -306,6 +306,23 @@ target_include_directories(rts_kernel_state
         ${PROJECT_SOURCE_DIR}/tests/config
 )
 
+add_library(rts_scheduler_policy STATIC
+    ${PROJECT_SOURCE_DIR}/kernel/scheduler_policy.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_fixed_priority.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_rms.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_edf.c
+)
+target_include_directories(rts_scheduler_policy PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/kernel
+    ${PROJECT_SOURCE_DIR}/tests/config
+)
+target_link_libraries(rts_scheduler_policy PRIVATE
+    rts_kernel_state
+    rts_ready_queue
+    rts_intrusive_list
+)
+
 # The production host task-return trap enters the centralized fatal path.
 # Keep its focused stack-port test link-complete without weakening that path.
 target_link_libraries(rts_host_stack_port
@@ -332,6 +349,7 @@ target_link_libraries(rts_task_create
         rts_task_validation
         rts_task_object
         rts_ready_queue
+        rts_scheduler_policy
         rts_kernel_state
         rts_diagnostics_core
 )
@@ -391,6 +409,7 @@ target_link_libraries(rts_kernel_bootstrap
         rts_kernel_state
         rts_task_pool
         rts_ready_queue
+        rts_scheduler_policy
         rts_delay_queue
         rts_diagnostics_core
 )
@@ -423,10 +442,14 @@ target_link_libraries(rts_test_kernel_bootstrap
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(rts_kernel_state PRIVATE -Wall -Wextra -Werror)
+    target_compile_options(rts_scheduler_policy PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
     target_compile_options(rts_kernel_bootstrap PRIVATE -Wall -Wextra -Werror)
     target_compile_options(rts_test_kernel_bootstrap PRIVATE -Wall -Wextra -Werror)
 elseif(MSVC)
     target_compile_options(rts_kernel_state PRIVATE /W4 /WX)
+    target_compile_options(rts_scheduler_policy PRIVATE /W4 /WX)
     target_compile_options(rts_kernel_bootstrap PRIVATE /W4 /WX)
     target_compile_options(rts_test_kernel_bootstrap PRIVATE /W4 /WX)
 endif()
@@ -572,8 +595,37 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/trace.c
     ${PROJECT_SOURCE_DIR}/kernel/invariant_check.c
     ${PROJECT_SOURCE_DIR}/kernel/power.c
+    ${PROJECT_SOURCE_DIR}/kernel/scheduler_policy.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_fixed_priority.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_rms.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_edf.c
     ${PROJECT_SOURCE_DIR}/ports/host/port.c
 )
+
+function(rts_add_scheduler_policy_test target config_directory)
+    add_executable(${target}
+        unit/test_scheduler_policy.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_scheduler_policy_test(rts_test_policy_fp tests/config)
+rts_add_scheduler_policy_test(rts_test_policy_rms tests/config_rms)
+rts_add_scheduler_policy_test(rts_test_policy_edf tests/config_edf)
 
 function(rts_add_yield_test target config_directory)
     add_executable(${target}

@@ -30,5 +30,6 @@ bool rts_ready_only_contains(const rts_ready_set_t *ready_set,
                              const rts_tcb_t *task);
 void rts_ready_rotate(rts_ready_set_t *ready_set,
                       rts_priority_t priority);
+bool rts_ready_validate(const rts_ready_set_t *ready_set);
 
 #endif /* RTS_READY_QUEUE_H */

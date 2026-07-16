@@ -9,6 +9,7 @@
 #include "time_internal.h"
 #include "timer_internal.h"
 #include "trace_internal.h"
+#include "scheduler_policy.h"
 
 #if defined(__GNUC__) || defined(__clang__)
 #define RTS_POWER_WEAK __attribute__((weak))
@@ -51,7 +52,7 @@ bool rts_power_sleep_is_allowed(void)
            kernel->current_task == kernel->idle_task &&
            kernel->idle_task->state == RTS_TASK_STATE_RUNNING &&
            !kernel->switch_plan.pending && !kernel->switch_plan.active &&
-           rts_ready_only_contains(&kernel->ready_set, kernel->idle_task);
+           rts_policy_pick_next() == kernel->idle_task;
 #else
     return false;
 #endif

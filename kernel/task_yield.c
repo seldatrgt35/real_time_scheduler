@@ -7,6 +7,7 @@
 #include "scheduler_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "scheduler_policy.h"
 
 static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -14,7 +15,8 @@ static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
 
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            rts_scheduler_current_is_valid() &&
-           rts_ready_is_front(&kernel->ready_set, current) &&
+           rts_policy_validate(current, true) &&
+           rts_policy_pick_next() == current &&
            !kernel->switch_plan.active;
 }
 
@@ -57,20 +59,17 @@ rts_status_t rts_task_yield(void)
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.yields);
 #endif
     RTS_TRACE(RTS_TRACE_YIELD, current->priority, 0u);
-    if (!rts_ready_has_peer(&kernel->ready_set, current))
+    if (!rts_policy_yield(current))
     {
         rts_port_critical_exit(critical_token);
         return RTS_STATUS_OK;
     }
 
-    rts_ready_rotate(&kernel->ready_set, current->priority);
     selected = rts_scheduler_select_highest_ready();
     RTS_ASSERT(selected != NULL);
     RTS_ASSERT(selected != current);
-    RTS_ASSERT(selected == NULL || selected->priority == current->priority);
     RTS_ASSERT(selected == NULL || selected->state == RTS_TASK_STATE_READY);
     if (selected == NULL || selected == current ||
-        selected->priority != current->priority ||
         selected->state != RTS_TASK_STATE_READY)
     {
         rts_port_critical_exit(critical_token);

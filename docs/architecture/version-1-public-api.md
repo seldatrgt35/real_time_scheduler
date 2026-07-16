@@ -29,6 +29,17 @@ The descriptor uses `void *stack_buffer` plus `size_t stack_size_bytes`. Byte si
 
 Applications may supply a manually declared buffer, but then must satisfy `RTS_TASK_STACK_ALIGNMENT`; the declaration macro is preferred. No compiler-specific attribute appears in the generic header: the macro uses standard C11 `_Alignas`.
 
+## Sprint 12 timing-metadata amendment
+
+Sprint 12 supersedes the original descriptor restriction that excluded period,
+deadline, and budget fields. Compile-time RMS and EDF selection require timing
+metadata during startup registration, and Version 1 intentionally has no second
+task-registration API. The five original scheduler/task function signatures,
+opaque handle model, static ownership, and caller-owned stack contract remain
+unchanged. The descriptor therefore adds `period`, `relative_deadline`, and
+`execution_budget`; these are copied values and expose no private kernel data.
+The budget is an analysis placeholder and is not enforced in Sprint 12.
+
 ## 4. Task creation descriptor
 
 | Field | Ownership/lifetime | Nullability and validation | Stored behavior |
@@ -38,8 +49,11 @@ Applications may supply a manually declared buffer, but then must satisfy `RTS_T
 | `stack_buffer` | Application owns the storage; it must have static lifetime and must not be accessed as ordinary data after successful creation. | Must not be null; address, size, and non-overlap assumptions are validated where feasible. | Pointer is stored; contents are used for task context. |
 | `stack_size_bytes` | Value is copied. | Must meet selected-port minimum and alignment constraints. | Bounds the private stack region; scheduling rank is unaffected. |
 | `priority` | Value owned by the descriptor and copied at creation. | Must be in `1..RTS_PRIORITY_COUNT-1`; zero is reserved. | Determines fixed-priority ordering and is immutable in version 1. |
+| `period` | Value is copied. | Required and half-range bounded for RMS; optional for FP/EDF. | Defines RMS rank; otherwise metadata only. |
+| `relative_deadline` | Value is copied. | Required for RMS/EDF and half-range bounded; RMS also requires it not exceed period. | Recomputes EDF absolute deadline at every release. |
+| `execution_budget` | Value is copied. | Must not exceed a required deadline. | Reserved for future analysis; not enforced at runtime. |
 
-The descriptor itself is read only during `rts_task_create()` and may have automatic lifetime. Referenced stack storage must have system lifetime. No task-storage pointer, name, ID, deadline, period, budget, affinity, or future-policy field is present.
+The descriptor itself is read only during `rts_task_create()` and may have automatic lifetime. Referenced stack storage must have system lifetime. No task-storage pointer, name, ID, affinity, dynamic-allocation control, or private kernel field is present.
 
 ## 5. Task handle
 

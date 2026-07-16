@@ -87,6 +87,12 @@ void rts_task_object_reset(rts_tcb_t *task)
     task->owned_mutex_count = 0u;
     task->base_priority = RTS_IDLE_PRIORITY;
     task->priority = RTS_IDLE_PRIORITY;
+    task->period = 0u;
+    task->relative_deadline = 0u;
+    task->absolute_deadline = 0u;
+    task->release_tick = 0u;
+    task->execution_budget = 0u;
+    task->release_sequence = 0u;
     task->state = RTS_TASK_STATE_DORMANT;
 #if RTS_ENABLE_RUNTIME_STATS
     task->diagnostic_dispatch_count = 0u;
@@ -174,6 +180,12 @@ rts_status_t rts_task_object_initialize(const rts_task_pool_t *pool,
     task->owned_mutex_count = 0u;
     task->base_priority = config->priority;
     task->priority = config->priority;
+    task->period = config->period;
+    task->relative_deadline = config->relative_deadline;
+    task->absolute_deadline = 0u;
+    task->release_tick = 0u;
+    task->execution_budget = config->execution_budget;
+    task->release_sequence = 0u;
     task->state = RTS_TASK_STATE_DORMANT;
 #if RTS_ENABLE_RUNTIME_STATS
     task->diagnostic_dispatch_count = 0u;

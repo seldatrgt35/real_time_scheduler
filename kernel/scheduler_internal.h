@@ -41,6 +41,8 @@ typedef struct
     rts_tcb_t *idle_task;
     rts_tcb_t *timer_service_task;
     rts_ready_set_t ready_set;
+    rts_list_t edf_ready;
+    uint32_t policy_release_sequence;
     rts_delay_queue_t delay_queue;
     rts_tick_t current_tick;
     rts_switch_plan_t switch_plan;

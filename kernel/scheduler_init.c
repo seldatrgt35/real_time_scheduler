@@ -5,6 +5,7 @@
 #include "assert_internal.h"
 #include "port.h"
 #include "power_internal.h"
+#include "scheduler_policy.h"
 #include "scheduler_internal.h"
 #include "stack_check_internal.h"
 #include "timer_internal.h"
@@ -56,6 +57,12 @@ static void rts_idle_object_initialize(rts_kernel_state_t *kernel)
     idle->owned_mutex_count = 0u;
     idle->base_priority = RTS_IDLE_PRIORITY;
     idle->priority = RTS_IDLE_PRIORITY;
+    idle->period = 0u;
+    idle->relative_deadline = 0u;
+    idle->absolute_deadline = 0u;
+    idle->release_tick = 0u;
+    idle->execution_budget = 0u;
+    idle->release_sequence = 0u;
     idle->state = RTS_TASK_STATE_DORMANT;
     idle->slot_state = RTS_TASK_SLOT_ALLOCATED;
 #if RTS_ENABLE_RUNTIME_STATS
@@ -99,6 +106,12 @@ static void rts_timer_service_object_initialize(rts_kernel_state_t *kernel)
     service->owned_mutex_count = 0u;
     service->base_priority = (rts_priority_t)RTS_TIMER_SERVICE_PRIORITY;
     service->priority = (rts_priority_t)RTS_TIMER_SERVICE_PRIORITY;
+    service->period = 1u;
+    service->relative_deadline = 1u;
+    service->absolute_deadline = 0u;
+    service->release_tick = 0u;
+    service->execution_budget = 0u;
+    service->release_sequence = 0u;
     service->state = RTS_TASK_STATE_BLOCKED;
     service->slot_state = RTS_TASK_SLOT_ALLOCATED;
 #if RTS_ENABLE_RUNTIME_STATS
@@ -158,7 +171,7 @@ rts_status_t rts_init(void)
 
     rts_kernel_restore_reset(kernel);
     rts_task_pool_initialize(&kernel->application_task_pool);
-    rts_ready_initialize(&kernel->ready_set);
+    rts_policy_initialize();
     rts_delay_initialize(&kernel->delay_queue);
 
     port_status = rts_port_initialize();
@@ -202,8 +215,7 @@ rts_status_t rts_init(void)
 
     kernel->idle_task_storage.saved_stack_pointer =
         stack_result.saved_stack_pointer;
-    rts_ready_insert(&kernel->ready_set, &kernel->idle_task_storage);
-    if (!rts_ready_contains(&kernel->ready_set, &kernel->idle_task_storage))
+    if (!rts_policy_insert(&kernel->idle_task_storage))
     {
         rts_kernel_restore_reset(kernel);
         rts_port_critical_exit(critical_token);

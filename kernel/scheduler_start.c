@@ -8,6 +8,7 @@
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
 #include "timer_internal.h"
+#include "scheduler_policy.h"
 
 static bool rts_start_preflight_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -15,13 +16,13 @@ static bool rts_start_preflight_is_coherent(const rts_kernel_state_t *kernel)
            kernel->current_task == NULL && kernel->idle_task != NULL &&
            kernel->idle_task == &kernel->idle_task_storage &&
            kernel->idle_task->state == RTS_TASK_STATE_READY &&
-           rts_ready_contains(&kernel->ready_set, kernel->idle_task) &&
+           rts_policy_validate(kernel->idle_task, true) &&
            kernel->timer_service_task ==
                &kernel->timer_service_task_storage &&
            rts_scheduler_task_is_blocked_wait(
                kernel->timer_service_task) &&
            rts_timer_manager_get()->callback_queue.count == 0u &&
-           rts_ready_peek_highest(&kernel->ready_set) != NULL &&
+           rts_policy_pick_next() != NULL &&
            kernel->delay_queue.ordered_tasks.count == 0u &&
            !kernel->switch_plan.pending && !kernel->switch_plan.active &&
            kernel->switch_plan.from == NULL &&

@@ -33,6 +33,11 @@
 #error "all Sprint 11 tickless-idle options must be selected"
 #endif
 
+#if !defined(RTS_POLICY_FIXED_PRIORITY) || !defined(RTS_POLICY_RMS) || \
+    !defined(RTS_POLICY_EDF)
+#error "all Sprint 12 scheduler-policy selectors must be defined"
+#endif
+
 #if !defined(RTS_ENABLE_TIME_SLICING)
 #error "RTS_ENABLE_TIME_SLICING must be defined by the selected rts_config.h"
 #endif
@@ -98,6 +103,17 @@
 #if (RTS_TICKLESS_MAX_SLEEP_TICKS < 1) ||                         \
     (RTS_TICKLESS_MAX_SLEEP_TICKS > UINT32_C(0x7fffffff))
 #error "RTS_TICKLESS_MAX_SLEEP_TICKS must be in the wrap-safe half range"
+#endif
+
+#if ((RTS_POLICY_FIXED_PRIORITY != 0) &&                           \
+     (RTS_POLICY_FIXED_PRIORITY != 1)) ||                          \
+    ((RTS_POLICY_RMS != 0) && (RTS_POLICY_RMS != 1)) ||            \
+    ((RTS_POLICY_EDF != 0) && (RTS_POLICY_EDF != 1))
+#error "scheduler-policy selectors must be 0 or 1"
+#endif
+
+#if (RTS_POLICY_FIXED_PRIORITY + RTS_POLICY_RMS + RTS_POLICY_EDF) != 1
+#error "exactly one scheduler policy must be selected"
 #endif
 
 #if (RTS_ENABLE_TIME_SLICING != 0) && (RTS_ENABLE_TIME_SLICING != 1)
@@ -184,6 +200,12 @@ typedef struct
     void *stack_buffer;
     size_t stack_size_bytes;
     rts_priority_t priority;
+    /** RMS period; optional policy metadata for FP and EDF. */
+    rts_tick_t period;
+    /** Relative deadline used by RMS validation and EDF ordering. */
+    rts_tick_t relative_deadline;
+    /** Reserved for analysis/admission work; not enforced in Sprint 12. */
+    rts_tick_t execution_budget;
 } rts_task_config_t;
 
 #ifdef __cplusplus

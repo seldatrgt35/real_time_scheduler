@@ -7,14 +7,15 @@
 #include "stack_check_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
+#include "scheduler_policy.h"
 
 static void rts_task_create_rollback(rts_kernel_state_t *kernel,
                                      rts_tcb_t *task,
                                      size_t slot_index)
 {
-    if (rts_ready_contains(&kernel->ready_set, task))
+    if (rts_policy_validate(task, true))
     {
-        rts_ready_remove(&kernel->ready_set, task);
+        (void)rts_policy_remove(task);
     }
     rts_task_object_reset(task);
     rts_task_pool_rollback(&kernel->application_task_pool, slot_index);
@@ -90,10 +91,9 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     }
     task->saved_stack_pointer = stack_result.saved_stack_pointer;
 
-    rts_ready_insert(&kernel->ready_set, task);
-    if (!rts_ready_contains(&kernel->ready_set, task))
+    if (!rts_policy_insert(task))
     {
-        RTS_ASSERT(rts_ready_contains(&kernel->ready_set, task));
+        RTS_ASSERT(rts_policy_validate(task, true));
         rts_task_create_rollback(kernel, task, slot_index);
         rts_port_critical_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
@@ -104,7 +104,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     RTS_ASSERT(task->slot_state == RTS_TASK_SLOT_ALLOCATED);
     if (task->slot_state != RTS_TASK_SLOT_ALLOCATED)
     {
-        rts_ready_remove(&kernel->ready_set, task);
+        (void)rts_policy_remove(task);
         rts_task_create_rollback(kernel, task, slot_index);
         rts_port_critical_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;

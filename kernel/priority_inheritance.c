@@ -10,6 +10,7 @@
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
 #include "config_internal.h"
+#include "scheduler_policy.h"
 
 static rts_wait_object_storage_t *rts_priority_waiters_for(rts_tcb_t *task)
 {
@@ -29,7 +30,7 @@ bool rts_priority_set_effective(rts_tcb_t *task,
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_wait_object_storage_t *waiters;
-    bool ready_linked;
+    rts_priority_t previous;
 
     if (task == NULL || effective_priority < task->base_priority ||
         effective_priority == RTS_IDLE_PRIORITY ||
@@ -42,14 +43,12 @@ bool rts_priority_set_effective(rts_tcb_t *task,
         return true;
     }
 
-    ready_linked = rts_ready_contains(&kernel->ready_set, task);
-    if (ready_linked)
+    previous = task->priority;
+    if (!rts_policy_priority_changed(task, effective_priority))
     {
-        rts_ready_remove(&kernel->ready_set, task);
+        return false;
     }
     {
-        rts_priority_t previous = task->priority;
-        task->priority = effective_priority;
 #if RTS_ENABLE_RUNTIME_STATS
         if (effective_priority > previous)
         {
@@ -63,11 +62,6 @@ bool rts_priority_set_effective(rts_tcb_t *task,
         RTS_TRACE(RTS_TRACE_PRIORITY, previous, effective_priority);
         (void)previous;
     }
-    if (ready_linked)
-    {
-        rts_ready_insert(&kernel->ready_set, task);
-    }
-
     waiters = rts_priority_waiters_for(task);
     if (waiters != NULL)
     {

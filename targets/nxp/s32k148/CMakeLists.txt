@@ -46,6 +46,10 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
     ${PROJECT_SOURCE_DIR}/kernel/time.c
     ${PROJECT_SOURCE_DIR}/kernel/power.c
+    ${PROJECT_SOURCE_DIR}/kernel/scheduler_policy.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_fixed_priority.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_rms.c
+    ${PROJECT_SOURCE_DIR}/kernel/policy_edf.c
 )
 
 add_library(rts_target_s32k148 STATIC

@@ -4,13 +4,13 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. Scheduling, delay/time slicing, synchronization, software timers, diagnostics, and tickless idle are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
+> **Project status:** Active development. Compile-time FP, RMS, and EDF scheduling, delay/time slicing, synchronization, software timers, diagnostics, and tickless idle are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
 
 ## Design goals
 
 - Deterministic execution with statically bounded time and memory usage
 - Static allocation only; no heap and no task deletion in Version 1
-- Fixed-priority preemptive scheduling, with higher numeric priority winning
+- Compile-time-selected FP, RMS, or EDF scheduling with no runtime policy switch
 - FIFO ordering within each priority and optional round-robin rotation
 - A portable C11 kernel separated from architecture and board support
 - Caller-owned, byte-counted task stacks with a kernel-owned private TCB pool
@@ -45,6 +45,8 @@ The repository currently includes:
   active queue, bounded callback FIFO, and private deferred service task;
 - a portable tickless-idle power manager with wrap-safe earliest-wake
   calculation, coalesced time compensation, optional hooks, and diagnostics;
+- a policy-independent scheduler core with FP bitmap/FIFO, RMS static period
+  ranking, and an ordered EDF ready-set plugin;
 - deterministic host sleep simulation and an S32K148 LPTMR0/WFI target path;
 - deterministic 20,000-event diagnostics stress tests in enabled, release, and
   no-time-slicing configurations;
@@ -59,12 +61,14 @@ The following Version 1 work remains:
 - physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
-Runtime task creation, task deletion, EDF, rate-monotonic policy support, and
-floating-point context switching remain outside the current baseline.
+Runtime task creation, task deletion, admission control, runtime policy
+switching, and floating-point context switching remain outside the baseline.
 
 ## Scheduling model
 
-Version 1 uses a fixed-priority preemptive model:
+Version 1 selects exactly one scheduling policy at compile time. FP retains the
+accepted larger-number-wins FIFO model; RMS derives those priorities from task
+periods; EDF orders tasks by absolute deadline and release FIFO order.
 
 - priorities range from `0` to `RTS_PRIORITY_COUNT - 1`;
 - priority `0` is reserved for the kernel idle task;
@@ -195,6 +199,9 @@ Every build selects exactly one `rts_config.h`. The current private and public c
 | `RTS_TIMER_CALLBACK_QUEUE_CAPACITY` | Fixed callback-work ring capacity |
 | `RTS_PRIORITY_COUNT` | Total priority levels, including idle priority zero |
 | `RTS_TICK_RATE_HZ` | Scheduler tick frequency |
+| `RTS_POLICY_FIXED_PRIORITY` | Selects the fixed-priority plugin (exactly one policy is `1`) |
+| `RTS_POLICY_RMS` | Selects static rate-monotonic period ranking |
+| `RTS_POLICY_EDF` | Selects absolute-deadline ready ordering |
 | `RTS_ENABLE_TIME_SLICING` | Enables equal-priority time slicing |
 | `RTS_TIME_SLICE_TICKS` | Length of one time slice |
 | `RTS_IDLE_STACK_SIZE_BYTES` | Size of the private idle-task stack |

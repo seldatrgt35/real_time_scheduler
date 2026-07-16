@@ -228,7 +228,7 @@ bool rts_scheduler_reselect_after_switch(void)
         return false;
     }
 
-    if (selected != current && selected->priority > current->priority)
+    if (selected != current)
     {
         return rts_scheduler_prepare_switch(selected);
     }

@@ -450,21 +450,30 @@ int main(void)
         .argument = &g_task_a_argument,
         .stack_buffer = g_task_a_stack,
         .stack_size_bytes = sizeof(g_task_a_stack),
-        .priority = 3u
+        .priority = 3u,
+        .period = 20u,
+        .relative_deadline = 20u,
+        .execution_budget = 0u
     };
     const rts_task_config_t config_b = {
         .entry = rts_smoke_task,
         .argument = &g_task_b_argument,
         .stack_buffer = g_task_b_stack,
         .stack_size_bytes = sizeof(g_task_b_stack),
-        .priority = 1u
+        .priority = 1u,
+        .period = 40u,
+        .relative_deadline = 40u,
+        .execution_budget = 0u
     };
     const rts_task_config_t config_c = {
         .entry = rts_smoke_task,
         .argument = &g_task_c_argument,
         .stack_buffer = g_task_c_stack,
         .stack_size_bytes = sizeof(g_task_c_stack),
-        .priority = 2u
+        .priority = 2u,
+        .period = 30u,
+        .relative_deadline = 30u,
+        .execution_budget = 0u
     };
     const rts_timer_config_t periodic_timer_config = {
         .period = 25u,
