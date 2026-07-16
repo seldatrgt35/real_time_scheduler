@@ -2,6 +2,10 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
+#include "stack_check_internal.h"
+#include "fatal_internal.h"
 
 static uint32_t rts_switch_next_generation(uint32_t generation)
 {
@@ -75,6 +79,9 @@ bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
         plan->to = next_task;
         plan->pending = true;
         plan->generation = rts_switch_next_generation(plan->generation);
+#if RTS_ENABLE_RUNTIME_STATS
+        RTS_DIAG_COUNTER_INC(kernel->runtime_counters.switch_requests);
+#endif
         return true;
     }
 
@@ -150,6 +157,14 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
     bool valid;
 
     RTS_ASSERT(snapshot != NULL);
+    if (snapshot != NULL &&
+        (!rts_stack_guard_is_valid(snapshot->from) ||
+         !rts_stack_guard_is_valid(snapshot->to) ||
+         !rts_stack_saved_sp_is_valid(snapshot->from) ||
+         !rts_stack_saved_sp_is_valid(snapshot->to)))
+    {
+        RTS_KERNEL_FATAL(RTS_FATAL_STACK_CORRUPTION, snapshot);
+    }
     valid = snapshot != NULL && kernel->lifecycle == RTS_KERNEL_RUNNING &&
             plan->active && !plan->pending &&
             snapshot->generation == plan->generation &&
@@ -165,6 +180,7 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
         return;
     }
 
+    rts_runtime_task_stopped(snapshot->from, kernel->current_tick);
     if (snapshot->from->state == RTS_TASK_STATE_RUNNING)
     {
         snapshot->from->state = RTS_TASK_STATE_READY;
@@ -176,6 +192,12 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
     snapshot->to->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     snapshot->to->state = RTS_TASK_STATE_RUNNING;
     kernel->current_task = snapshot->to;
+    rts_runtime_task_started(snapshot->to, kernel->current_tick);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.context_switches);
+#endif
+    RTS_TRACE(RTS_TRACE_TASK_SWITCHED,
+              snapshot->from->priority, snapshot->to->priority);
     rts_switch_plan_clear(plan);
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
 }

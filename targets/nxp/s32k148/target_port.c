@@ -7,6 +7,7 @@
 #include "assert_internal.h"
 #include "port_internal.h"
 #include "target_config.h"
+#include "target_diagnostics.h"
 #include "target_tick.h"
 
 extern void (*const g_pfnVectors[])(void);
@@ -24,6 +25,10 @@ rts_critical_token_t rts_port_critical_enter(void)
     uint32_t next_depth;
 
     __disable_irq();
+    if (rts_s32k148_critical_depth == 0u)
+    {
+        rts_s32k148_timing_critical_begin();
+    }
     next_depth = rts_s32k148_critical_depth + 1u;
     RTS_FATAL_UNLESS(next_depth != 0u);
     rts_s32k148_critical_depth = next_depth;
@@ -45,6 +50,10 @@ void rts_port_critical_exit(rts_critical_token_t token)
         return;
     }
     rts_s32k148_critical_depth = token_depth - 1u;
+    if (rts_s32k148_critical_depth == 0u)
+    {
+        rts_s32k148_timing_critical_end();
+    }
     __DSB();
     __set_PRIMASK(previous);
     __ISB();
@@ -53,6 +62,18 @@ void rts_port_critical_exit(rts_critical_token_t token)
 bool rts_port_is_in_isr(void)
 {
     return __get_IPSR() != 0u;
+}
+
+uint32_t rts_port_exception_number(void)
+{
+    return __get_IPSR();
+}
+
+void rts_port_fatal_disable(void)
+{
+    __disable_irq();
+    __DSB();
+    __ISB();
 }
 
 rts_status_t rts_port_initialize(void)

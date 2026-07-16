@@ -6,6 +6,8 @@
 #include "port.h"
 #include "scheduler_internal.h"
 #include "time_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -75,6 +77,11 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     current->wait.timeout_active = false;
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     current->state = RTS_TASK_STATE_BLOCKED;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.delay_blocks);
+    RTS_DIAG_COUNTER_INC(current->diagnostic_block_count);
+#endif
+    RTS_TRACE(RTS_TRACE_TASK_BLOCKED, RTS_WAIT_DELAY, delay);
     rts_delay_insert(&kernel->delay_queue, current);
     RTS_FATAL_UNLESS(rts_scheduler_task_is_blocked_delay(current));
 

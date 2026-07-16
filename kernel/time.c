@@ -8,6 +8,8 @@
 #include "scheduler_internal.h"
 #include "semaphore_internal.h"
 #include "mutex_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 rts_tick_t rts_kernel_tick_now(void)
 {
@@ -54,6 +56,11 @@ static bool rts_tick_wake_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
     task->state = still_executing ? RTS_TASK_STATE_RUNNING
                                   : RTS_TASK_STATE_READY;
     rts_ready_insert(&kernel->ready_set, task);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.delay_wakeups);
+    RTS_DIAG_COUNTER_INC(task->diagnostic_wake_count);
+#endif
+    RTS_TRACE(RTS_TRACE_TASK_WOKE, RTS_WAIT_DELAY, task->priority);
     RTS_FATAL_UNLESS(rts_scheduler_task_is_runnable(task));
     return rts_scheduler_task_is_runnable(task);
 }
@@ -121,6 +128,12 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     }
 
     kernel->current_tick += elapsed_ticks;
+#if RTS_ENABLE_RUNTIME_STATS
+    kernel->runtime_counters.scheduler_ticks =
+        rts_diagnostic_counter_add(kernel->runtime_counters.scheduler_ticks,
+                                   elapsed_ticks);
+#endif
+    RTS_TRACE(RTS_TRACE_TICK, elapsed_ticks, kernel->current_tick);
     for (;;)
     {
         expired = rts_delay_peek_expired(&kernel->delay_queue,

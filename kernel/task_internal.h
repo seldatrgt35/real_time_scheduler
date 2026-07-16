@@ -83,6 +83,17 @@ struct rts_task
     rts_task_state_t state;
     rts_task_slot_state_t slot_state;
 
+#if RTS_ENABLE_RUNTIME_STATS
+    uint32_t diagnostic_dispatch_count;
+    uint32_t diagnostic_block_count;
+    uint32_t diagnostic_wake_count;
+    uint32_t diagnostic_running_ticks;
+    rts_tick_t diagnostic_last_start_tick;
+#endif
+#if RTS_ENABLE_STACK_WATERMARK
+    uint32_t diagnostic_max_stack_used;
+#endif
+
 #if RTS_ENABLE_ASSERTIONS
     uint32_t validation_magic;
 #endif

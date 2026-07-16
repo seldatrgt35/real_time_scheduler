@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "rts/rts_types.h"
+#include "fatal_internal.h"
 
 #define RTS_TASK_VALIDATION_MAGIC UINT32_C(0x52545354)
 

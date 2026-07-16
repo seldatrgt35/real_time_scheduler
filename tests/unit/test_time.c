@@ -3,10 +3,29 @@
 
 #include "scheduler_internal.h"
 #include "semaphore_internal.h"
+#include "trace_internal.h"
+#include "diagnostics_internal.h"
 #include "time_internal.h"
 
 static int test_failures;
 static unsigned int assertion_count;
+
+uint32_t rts_diagnostic_counter_increment(uint32_t value)
+{
+    return value == UINT32_MAX ? UINT32_MAX : value + 1u;
+}
+
+uint32_t rts_diagnostic_counter_add(uint32_t value, uint32_t increment)
+{
+    return increment > UINT32_MAX - value ? UINT32_MAX : value + increment;
+}
+
+void rts_trace_emit(rts_trace_event_t event, uintptr_t arg0, uintptr_t arg1)
+{
+    (void)event;
+    (void)arg0;
+    (void)arg1;
+}
 
 bool rts_semaphore_timeout_task(rts_kernel_state_t *kernel,
                                 rts_tcb_t *task)
@@ -86,6 +105,12 @@ bool rts_scheduler_task_is_runnable(const rts_tcb_t *task)
 }
 
 bool rts_scheduler_task_is_blocked_delay(const rts_tcb_t *task)
+{
+    (void)task;
+    return false;
+}
+
+bool rts_scheduler_task_is_blocked_wait(const rts_tcb_t *task)
 {
     (void)task;
     return false;

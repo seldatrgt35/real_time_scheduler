@@ -34,12 +34,18 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
     ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
     ${PROJECT_SOURCE_DIR}/kernel/mutex.c
+    ${PROJECT_SOURCE_DIR}/kernel/fatal.c
+    ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
+    ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c
+    ${PROJECT_SOURCE_DIR}/kernel/trace.c
+    ${PROJECT_SOURCE_DIR}/kernel/invariant_check.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
     ${PROJECT_SOURCE_DIR}/kernel/time.c
 )
 
 add_library(rts_target_s32k148 STATIC
     target.c
+    target_diagnostics.c
     target_port.c
     target_runtime.c
     target_tick.c
@@ -114,6 +120,7 @@ target_link_options(rts_example_s32k148_basic PRIVATE
 
 find_program(RTS_S32K148_OBJDUMP NAMES arm-none-eabi-objdump llvm-objdump REQUIRED)
 find_program(RTS_S32K148_NM NAMES arm-none-eabi-nm llvm-nm REQUIRED)
+find_program(RTS_S32K148_SIZE NAMES arm-none-eabi-size llvm-size REQUIRED)
 add_custom_command(TARGET rts_example_s32k148_basic POST_BUILD
     COMMAND ${CMAKE_COMMAND}
             -DELF_FILE=$<TARGET_FILE:rts_example_s32k148_basic>
@@ -121,6 +128,11 @@ add_custom_command(TARGET rts_example_s32k148_basic POST_BUILD
             -DNM_TOOL=${RTS_S32K148_NM}
             -DOBJDUMP_TOOL=${RTS_S32K148_OBJDUMP}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/verify_image.cmake
+    COMMAND ${CMAKE_COMMAND}
+            -DELF_FILE=$<TARGET_FILE:rts_example_s32k148_basic>
+            -DOUTPUT_DIR=$<TARGET_FILE_DIR:rts_example_s32k148_basic>
+            -DSIZE_TOOL=${RTS_S32K148_SIZE}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/report_sizes.cmake
     VERBATIM
 )
 

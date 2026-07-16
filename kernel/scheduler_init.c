@@ -5,6 +5,7 @@
 #include "assert_internal.h"
 #include "port.h"
 #include "scheduler_internal.h"
+#include "stack_check_internal.h"
 
 static void rts_idle_entry(void *argument)
 {
@@ -46,6 +47,16 @@ static void rts_idle_object_initialize(rts_kernel_state_t *kernel)
     idle->priority = RTS_IDLE_PRIORITY;
     idle->state = RTS_TASK_STATE_DORMANT;
     idle->slot_state = RTS_TASK_SLOT_ALLOCATED;
+#if RTS_ENABLE_RUNTIME_STATS
+    idle->diagnostic_dispatch_count = 0u;
+    idle->diagnostic_block_count = 0u;
+    idle->diagnostic_wake_count = 0u;
+    idle->diagnostic_running_ticks = 0u;
+    idle->diagnostic_last_start_tick = 0u;
+#endif
+#if RTS_ENABLE_STACK_WATERMARK
+    idle->diagnostic_max_stack_used = 0u;
+#endif
 #if RTS_ENABLE_ASSERTIONS
     idle->validation_magic = 0u;
 #endif
@@ -104,6 +115,8 @@ rts_status_t rts_init(void)
     }
 
     rts_idle_object_initialize(kernel);
+    rts_stack_diagnostics_prepare(kernel->idle_task_storage.stack_low,
+                                  kernel->idle_task_storage.stack_high);
     stack_result = rts_port_stack_initialize(kernel->idle_stack,
                                              sizeof(kernel->idle_stack),
                                              rts_idle_entry, NULL);

@@ -2,6 +2,9 @@
 
 SysTick_Type rts_test_systick;
 SCB_Type rts_test_scb;
+FPU_Type rts_test_fpu;
+DWT_Type rts_test_dwt;
+CoreDebug_Type rts_test_core_debug;
 uint32_t rts_test_primask;
 uint32_t rts_test_ipsr;
 uint32_t rts_test_psp;

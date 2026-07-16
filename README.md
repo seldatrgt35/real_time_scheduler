@@ -4,7 +4,7 @@ A clean, statically allocated real-time scheduler designed from first principles
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. Scheduling, delay/time slicing, static counting/binary semaphores with timeout and ISR-safe give, Cortex-M4F execution, and an SDK-dependent S32K148 smoke image are implemented. Physical target validation is not yet complete. The project is not currently safety-certified or ready for production deployment.
+> **Project status:** Active development. Scheduling, delay/time slicing, semaphores, mutexes with bounded priority inheritance, and compile-time kernel diagnostics are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
 
 ## Design goals
 
@@ -36,6 +36,13 @@ The repository currently includes:
 - compile-time optional tick-driven equal-priority round robin;
 - statically owned counting/binary semaphores with deterministic priority/FIFO waiters;
 - finite/forever semaphore waits, direct handoff, timeout arbitration, and ISR-safe give;
+- non-recursive mutexes with bounded transitive priority inheritance, timeout,
+  direct handoff, and deterministic restoration;
+- centralized fatal/assert handling and S32K148 HardFault evidence capture;
+- optional stack guards, stack watermarking, runtime counters, private
+  snapshots, a fixed trace ring, and bounded global invariant validation;
+- deterministic 20,000-event diagnostics stress tests in enabled, release, and
+  no-time-slicing configurations;
 - the public scheduler-start transaction;
 - a deterministic host port and focused host tests;
 - a Cortex-M4F 64-byte initial task frame;
@@ -47,7 +54,9 @@ The following Version 1 work remains:
 - physical S32K148 validation of the implemented startup, vector, linker, and timed smoke image;
 - target execution tests and hardware validation.
 
-Mutexes and priority inheritance, runtime task creation, task deletion, EDF, rate-monotonic policy support, and floating-point context switching remain outside the current baseline.
+Software timers, runtime task creation, task deletion, EDF, rate-monotonic
+policy support, and floating-point context switching remain outside the current
+baseline.
 
 ## Scheduling model
 
@@ -173,6 +182,14 @@ Every build selects exactly one `rts_config.h`. The current private and public c
 | `RTS_TIME_SLICE_TICKS` | Length of one time slice |
 | `RTS_IDLE_STACK_SIZE_BYTES` | Size of the private idle-task stack |
 | `RTS_ENABLE_ASSERTIONS` | Enables internal contract assertions |
+| `RTS_ENABLE_DIAGNOSTICS` | Enables the private diagnostic snapshot layer |
+| `RTS_ENABLE_TRACE` | Enables the fixed overwrite-oldest trace ring |
+| `RTS_ENABLE_STACK_GUARDS` | Reserves and verifies the low stack guard |
+| `RTS_ENABLE_STACK_WATERMARK` | Enables on-demand pattern-based high-water scans |
+| `RTS_ENABLE_RUNTIME_STATS` | Adds bounded kernel and per-task counters |
+| `RTS_ENABLE_INVARIANT_CHECKS` | Enables bounded full-kernel validators |
+| `RTS_TRACE_CAPACITY` | Compile-time trace-entry capacity |
+| `RTS_STACK_GUARD_SIZE_BYTES` | Low-address guard reservation per stack |
 
 The host tests provide example configurations under `tests/config*`.
 
@@ -234,6 +251,8 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Sprint 4 acceptance review](docs/architecture/sprint-4-acceptance-review.md)
 - [Cortex-M4F execution contract](docs/architecture/sprint-6-cortex-m4f-execution-contract.md)
 - [Sprint 6 acceptance review](docs/architecture/sprint-6-acceptance-review.md)
+- [Sprint 9 diagnostics implementation](docs/implementation/sprint-9-kernel-diagnostics.md)
+- [Sprint 9 acceptance review](docs/architecture/sprint-9-acceptance-review.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -249,12 +268,11 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 
 ## Roadmap
 
-1. Implement the portable tick path and delayed-task wakeup transaction.
-2. Integrate time-slice expiry with switch planning.
-3. Validate the S32K148 startup, linker, exception, and context-switch contracts on hardware.
-4. Run target-side ABI, interrupt, stack, and timing validation.
-5. Complete production-readiness and safety-analysis activities before deployment.
-6. Add mutex ownership and bounded priority inheritance in Sprint 8B.
+1. Run the long-duration S32K148 smoke and deliberate fault-capture image.
+2. Measure target stack margins, context-switch latency, and critical windows.
+3. Implement statically allocated Software Timers without callbacks in the tick
+   critical path.
+4. Complete production-readiness and safety-analysis activities before deployment.
 
 ## License
 

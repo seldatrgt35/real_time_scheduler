@@ -157,8 +157,6 @@ rts_port_stack_result_t rts_port_stack_initialize(void *stack_buffer,
 
 _Noreturn void rts_cm4f_task_return_trap(void)
 {
-    RTS_FATAL_UNLESS(false);
-    for (;;)
-    {
-    }
+    RTS_KERNEL_FATAL(RTS_FATAL_TASK_RETURNED,
+                     rts_kernel_state_get()->current_task);
 }

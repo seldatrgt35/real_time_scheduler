@@ -15,6 +15,7 @@ file(READ "${DISASSEMBLY_FILE}" disassembly)
 foreach(required Reset_Handler SVC_Handler PendSV_Handler SysTick_Handler
                  HardFault_Handler
                  rts_kernel_tick_advance
+                 rts_kernel_fatal_at g_rts_fatal_record
                  g_pfnVectors __StackTop
                  g_task_a_stack g_task_b_stack g_task_c_stack)
     string(REGEX MATCHALL "(^|\n)[0-9a-fA-F]+[ \t]+[A-Za-z][ \t]+${required}(\r?\n|$)"
@@ -26,7 +27,7 @@ foreach(required Reset_Handler SVC_Handler PendSV_Handler SysTick_Handler
     endif()
 endforeach()
 
-foreach(forbidden malloc calloc realloc free rts_host_test
+foreach(forbidden malloc calloc realloc free printf fprintf puts rts_host_test
                   LPIT0_Ch0_IRQHandler PIT_Ch0_IRQHandler)
     if(symbols MATCHES "[ \t]${forbidden}($|[ \t])")
         message(FATAL_ERROR "Forbidden final-image symbol found: ${forbidden}")

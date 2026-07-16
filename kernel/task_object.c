@@ -88,6 +88,16 @@ void rts_task_object_reset(rts_tcb_t *task)
     task->base_priority = RTS_IDLE_PRIORITY;
     task->priority = RTS_IDLE_PRIORITY;
     task->state = RTS_TASK_STATE_DORMANT;
+#if RTS_ENABLE_RUNTIME_STATS
+    task->diagnostic_dispatch_count = 0u;
+    task->diagnostic_block_count = 0u;
+    task->diagnostic_wake_count = 0u;
+    task->diagnostic_running_ticks = 0u;
+    task->diagnostic_last_start_tick = 0u;
+#endif
+#if RTS_ENABLE_STACK_WATERMARK
+    task->diagnostic_max_stack_used = 0u;
+#endif
 #if RTS_ENABLE_ASSERTIONS
     task->validation_magic = 0u;
 #endif
@@ -165,6 +175,16 @@ rts_status_t rts_task_object_initialize(const rts_task_pool_t *pool,
     task->base_priority = config->priority;
     task->priority = config->priority;
     task->state = RTS_TASK_STATE_DORMANT;
+#if RTS_ENABLE_RUNTIME_STATS
+    task->diagnostic_dispatch_count = 0u;
+    task->diagnostic_block_count = 0u;
+    task->diagnostic_wake_count = 0u;
+    task->diagnostic_running_ticks = 0u;
+    task->diagnostic_last_start_tick = 0u;
+#endif
+#if RTS_ENABLE_STACK_WATERMARK
+    task->diagnostic_max_stack_used = 0u;
+#endif
 
 #if RTS_ENABLE_ASSERTIONS
     task->validation_magic = 0u;

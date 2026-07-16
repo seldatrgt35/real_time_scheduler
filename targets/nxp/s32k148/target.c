@@ -5,6 +5,7 @@
 
 #include "S32K148.h"
 #include "assert_internal.h"
+#include "fatal_internal.h"
 
 extern int main(void);
 
@@ -32,16 +33,14 @@ bool rts_s32k148_handler_probe_passed(void)
            g_rts_s32k148_fault_record.handler_probe_ipsr == 2u;
 }
 
-void rts_assert_fail(const char *expression, const char *file, int line)
+void rts_target_fatal_hook(const rts_fatal_record_t *record)
 {
-    (void)expression;
-    (void)file;
-    (void)line;
     __disable_irq();
-    g_rts_s32k148_fault_record.assertion_failed = 1u;
-    for (;;)
-    {
-    }
+    g_rts_s32k148_fault_record.assertion_failed =
+        record->reason == RTS_FATAL_ASSERTION ? 1u : 0u;
+    g_rts_s32k148_fault_record.fatal_reason = record->reason;
+    g_rts_s32k148_fault_record.fatal_tick = record->tick;
+    g_rts_s32k148_fault_record.fatal_current_task = record->current_task;
 }
 
 _Noreturn void rts_s32k148_hardfault_capture(const uint32_t *stacked_frame,
@@ -67,11 +66,11 @@ _Noreturn void rts_s32k148_hardfault_capture(const uint32_t *stacked_frame,
     }
     g_rts_s32k148_fault_record.cfsr = SCB->CFSR;
     g_rts_s32k148_fault_record.hfsr = SCB->HFSR;
+    g_rts_s32k148_fault_record.dfsr = SCB->DFSR;
+    g_rts_s32k148_fault_record.shcsr = SCB->SHCSR;
     g_rts_s32k148_fault_record.mmfar = SCB->MMFAR;
     g_rts_s32k148_fault_record.bfar = SCB->BFAR;
-    for (;;)
-    {
-    }
+    RTS_KERNEL_FATAL(RTS_FATAL_HARDFAULT, stacked_frame);
 }
 
 _Noreturn void rts_s32k148_reset_entry(void)
@@ -81,8 +80,5 @@ _Noreturn void rts_s32k148_reset_entry(void)
     __DSB();
     __ISB();
     (void)main();
-    rts_assert_fail("main returned", __FILE__, __LINE__);
-    for (;;)
-    {
-    }
+    RTS_KERNEL_FATAL(RTS_FATAL_TASK_RETURNED, NULL);
 }

@@ -4,6 +4,9 @@
 #include "port.h"
 #include "scheduler_internal.h"
 #include "task_internal.h"
+#include "stack_check_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 static void rts_task_create_rollback(rts_kernel_state_t *kernel,
                                      rts_tcb_t *task,
@@ -70,6 +73,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
         return status;
     }
 
+    rts_stack_diagnostics_prepare(task->stack_low, task->stack_high);
     stack_result = rts_port_stack_initialize(config->stack_buffer,
                                              config->stack_size_bytes,
                                              config->entry,
@@ -110,6 +114,10 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     task->validation_magic = RTS_TASK_VALIDATION_MAGIC;
 #endif
     *out_handle = task;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.task_creations);
+#endif
+    RTS_TRACE(RTS_TRACE_TASK_CREATED, task->priority, slot_index);
     rts_port_critical_exit(critical_token);
     return RTS_STATUS_OK;
 }

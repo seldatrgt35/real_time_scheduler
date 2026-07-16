@@ -5,6 +5,7 @@
 #include "port.h"
 #include "scheduler_internal.h"
 #include "target_config.h"
+#include "target_diagnostics.h"
 #include "target_tick.h"
 
 static int test_failures;
@@ -52,6 +53,9 @@ static void reset_environment(void)
 {
     rts_test_systick = (SysTick_Type){0};
     rts_test_scb = (SCB_Type){0};
+    rts_test_dwt = (DWT_Type){0};
+    rts_test_core_debug = (CoreDebug_Type){0};
+    g_rts_s32k148_timing_record = (rts_s32k148_timing_record_t){0};
     rts_test_primask = 1u;
     rts_test_ipsr = 0u;
     rts_test_dsb_count = 0u;
@@ -62,6 +66,24 @@ static void reset_environment(void)
     last_elapsed = 0u;
     tick_notification_required = false;
     switch_request_count = 0u;
+}
+
+static void test_dwt_critical_window_measurement(void)
+{
+    reset_environment();
+    rts_s32k148_timing_initialize();
+    CHECK(g_rts_s32k148_timing_record.cycle_counter_available == 1u);
+    CHECK((CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk) != 0u);
+    DWT->CYCCNT = 100u;
+    rts_s32k148_timing_critical_begin();
+    DWT->CYCCNT = 137u;
+    rts_s32k148_timing_critical_end();
+    CHECK(g_rts_s32k148_timing_record.maximum_critical_cycles == 37u);
+    DWT->CYCCNT = 200u;
+    rts_s32k148_timing_critical_begin();
+    DWT->CYCCNT = 205u;
+    rts_s32k148_timing_critical_end();
+    CHECK(g_rts_s32k148_timing_record.maximum_critical_cycles == 37u);
 }
 
 static void test_initialize_and_start_ordering(void)
@@ -136,6 +158,7 @@ static void test_initialization_failure_is_disabled(void)
 int main(void)
 {
     test_initialize_and_start_ordering();
+    test_dwt_critical_window_measurement();
     test_invalid_start_context();
     test_initialization_failure_is_disabled();
     return test_failures;

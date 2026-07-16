@@ -7,6 +7,8 @@
 #include "semaphore_internal.h"
 #include "time_internal.h"
 #include "wait_object_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 bool rts_semaphore_is_valid(const rts_semaphore_t *semaphore)
 {
@@ -85,6 +87,18 @@ static void rts_semaphore_make_ready(rts_kernel_state_t *kernel,
     task->state = still_executing ? RTS_TASK_STATE_RUNNING
                                   : RTS_TASK_STATE_READY;
     rts_ready_insert(&kernel->ready_set, task);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(task->diagnostic_wake_count);
+    if (result == RTS_WAIT_RESULT_ACQUIRED)
+    {
+        RTS_DIAG_COUNTER_INC(kernel->runtime_counters.semaphore_acquisitions);
+    }
+    else
+    {
+        RTS_DIAG_COUNTER_INC(kernel->runtime_counters.semaphore_timeouts);
+    }
+#endif
+    RTS_TRACE(RTS_TRACE_SEMAPHORE, result, task->priority);
     RTS_FATAL_UNLESS(rts_scheduler_task_is_runnable(task));
 }
 
@@ -157,6 +171,12 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
     if (semaphore->count > 0u)
     {
         --semaphore->count;
+#if RTS_ENABLE_RUNTIME_STATS
+        RTS_DIAG_COUNTER_INC(
+            kernel->runtime_counters.semaphore_acquisitions);
+#endif
+        RTS_TRACE(RTS_TRACE_SEMAPHORE,
+                  RTS_WAIT_RESULT_ACQUIRED, semaphore->count);
         rts_port_critical_exit(token);
         return RTS_STATUS_OK;
     }
@@ -183,6 +203,10 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
                                   : 0u;
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     current->state = RTS_TASK_STATE_BLOCKED;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.semaphore_blocks);
+    RTS_DIAG_COUNTER_INC(current->diagnostic_block_count);
+#endif
     rts_wait_object_insert(&semaphore->waiters, current);
     if (current->wait.timeout_active)
     {

@@ -7,6 +7,7 @@
 #include "delay_queue.h"
 #include "lifecycle_internal.h"
 #include "ready_queue.h"
+#include "diagnostics_internal.h"
 
 typedef struct
 {
@@ -39,6 +40,9 @@ typedef struct
     rts_delay_queue_t delay_queue;
     rts_tick_t current_tick;
     rts_switch_plan_t switch_plan;
+#if RTS_ENABLE_RUNTIME_STATS
+    rts_runtime_counters_t runtime_counters;
+#endif
 } rts_kernel_state_t;
 
 rts_kernel_state_t *rts_kernel_state_get(void);

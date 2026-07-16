@@ -5,6 +5,8 @@
 #include "assert_internal.h"
 #include "port.h"
 #include "scheduler_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -51,6 +53,10 @@ rts_status_t rts_task_yield(void)
 
     current = kernel->current_task;
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.yields);
+#endif
+    RTS_TRACE(RTS_TRACE_YIELD, current->priority, 0u);
     if (!rts_ready_has_peer(&kernel->ready_set, current))
     {
         rts_port_critical_exit(critical_token);

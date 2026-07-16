@@ -50,6 +50,19 @@ typedef struct
     volatile uint32_t mutex_low_lock_count;
     volatile uint32_t mutex_high_handoff_count;
     volatile uint32_t mutex_low_unlock_count;
+    volatile uint32_t diagnostic_context_switches;
+    volatile uint32_t diagnostic_idle_ticks;
+    volatile uint32_t diagnostic_non_idle_ticks;
+    volatile uint32_t diagnostic_fatal_reason;
+    volatile uint32_t diagnostic_invariant_failure;
+    volatile uint32_t diagnostic_cycle_counter_available;
+    volatile uint32_t diagnostic_maximum_critical_cycles;
+    volatile uint32_t task_a_dispatch_count;
+    volatile uint32_t task_b_dispatch_count;
+    volatile uint32_t task_c_dispatch_count;
+    volatile uint32_t task_a_max_stack_used;
+    volatile uint32_t task_b_max_stack_used;
+    volatile uint32_t task_c_max_stack_used;
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;

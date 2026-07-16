@@ -30,6 +30,15 @@
 #error "RTS_ENABLE_ASSERTIONS must be defined by the selected rts_config.h"
 #endif
 
+#if !defined(RTS_ENABLE_DIAGNOSTICS) || !defined(RTS_ENABLE_TRACE) ||         \
+    !defined(RTS_ENABLE_STACK_GUARDS) ||                                    \
+    !defined(RTS_ENABLE_STACK_WATERMARK) ||                                 \
+    !defined(RTS_ENABLE_RUNTIME_STATS) ||                                   \
+    !defined(RTS_ENABLE_INVARIANT_CHECKS) ||                                \
+    !defined(RTS_TRACE_CAPACITY) || !defined(RTS_STACK_GUARD_SIZE_BYTES)
+#error "all Sprint 9 diagnostic configuration options must be selected"
+#endif
+
 #if !defined(RTS_MAX_MUTEXES_PER_TASK)
 #define RTS_MAX_MUTEXES_PER_TASK RTS_MAX_TASKS
 #endif
@@ -60,6 +69,25 @@
 
 #if (RTS_ENABLE_ASSERTIONS != 0) && (RTS_ENABLE_ASSERTIONS != 1)
 #error "RTS_ENABLE_ASSERTIONS must be 0 or 1"
+#endif
+
+#if ((RTS_ENABLE_DIAGNOSTICS != 0) && (RTS_ENABLE_DIAGNOSTICS != 1)) ||       \
+    ((RTS_ENABLE_TRACE != 0) && (RTS_ENABLE_TRACE != 1)) ||                  \
+    ((RTS_ENABLE_STACK_GUARDS != 0) && (RTS_ENABLE_STACK_GUARDS != 1)) ||    \
+    ((RTS_ENABLE_STACK_WATERMARK != 0) &&                                   \
+     (RTS_ENABLE_STACK_WATERMARK != 1)) ||                                  \
+    ((RTS_ENABLE_RUNTIME_STATS != 0) && (RTS_ENABLE_RUNTIME_STATS != 1)) ||  \
+    ((RTS_ENABLE_INVARIANT_CHECKS != 0) &&                                  \
+     (RTS_ENABLE_INVARIANT_CHECKS != 1))
+#error "diagnostic feature options must be 0 or 1"
+#endif
+
+#if (RTS_ENABLE_TRACE == 1) && (RTS_TRACE_CAPACITY < 1)
+#error "RTS_TRACE_CAPACITY must be nonzero when trace is enabled"
+#endif
+
+#if (RTS_ENABLE_STACK_GUARDS == 1) && (RTS_STACK_GUARD_SIZE_BYTES < 4)
+#error "RTS_STACK_GUARD_SIZE_BYTES must be at least four when enabled"
 #endif
 
 #ifdef __cplusplus

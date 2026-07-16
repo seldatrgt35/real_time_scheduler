@@ -18,6 +18,8 @@ typedef struct
     volatile uint32_t stacked_xpsr;
     volatile uint32_t cfsr;
     volatile uint32_t hfsr;
+    volatile uint32_t dfsr;
+    volatile uint32_t shcsr;
     volatile uint32_t mmfar;
     volatile uint32_t bfar;
     volatile uint32_t active_msp;
@@ -25,6 +27,9 @@ typedef struct
     volatile uint32_t exc_return;
     volatile uint32_t handler_probe_msp;
     volatile uint32_t handler_probe_ipsr;
+    volatile uint32_t fatal_reason;
+    volatile uint32_t fatal_tick;
+    volatile uintptr_t fatal_current_task;
 } rts_s32k148_fault_record_t;
 
 extern rts_s32k148_fault_record_t g_rts_s32k148_fault_record;

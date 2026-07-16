@@ -1,3 +1,22 @@
+add_library(rts_diagnostics_core STATIC
+    ${PROJECT_SOURCE_DIR}/kernel/fatal.c
+    ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
+    ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c
+    ${PROJECT_SOURCE_DIR}/kernel/trace.c
+)
+target_include_directories(rts_diagnostics_core PRIVATE
+    ${PROJECT_SOURCE_DIR}/tests/config
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/kernel
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(rts_diagnostics_core PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
+elseif(MSVC)
+    target_compile_options(rts_diagnostics_core PRIVATE /W4 /WX)
+endif()
+
 add_library(rts_intrusive_list STATIC
     ${PROJECT_SOURCE_DIR}/kernel/intrusive_list.c
 )
@@ -287,6 +306,14 @@ target_include_directories(rts_kernel_state
         ${PROJECT_SOURCE_DIR}/tests/config
 )
 
+# The production host task-return trap enters the centralized fatal path.
+# Keep its focused stack-port test link-complete without weakening that path.
+target_link_libraries(rts_host_stack_port
+    PRIVATE
+        rts_diagnostics_core
+        rts_kernel_state
+)
+
 add_library(rts_task_create STATIC
     ${PROJECT_SOURCE_DIR}/kernel/task_create.c
     ${PROJECT_SOURCE_DIR}/kernel/task_handle.c
@@ -306,6 +333,7 @@ target_link_libraries(rts_task_create
         rts_task_object
         rts_ready_queue
         rts_kernel_state
+        rts_diagnostics_core
 )
 
 add_executable(rts_test_task_create
@@ -358,6 +386,7 @@ target_link_libraries(rts_kernel_bootstrap
         rts_task_pool
         rts_ready_queue
         rts_delay_queue
+        rts_diagnostics_core
 )
 
 add_executable(rts_test_kernel_bootstrap
@@ -468,6 +497,7 @@ target_link_libraries(rts_switch_plan
         rts_scheduler_select
         rts_kernel_state
         rts_ready_queue
+        rts_diagnostics_core
 )
 
 add_executable(rts_test_switch_plan
@@ -526,6 +556,11 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/semaphore.c
     ${PROJECT_SOURCE_DIR}/kernel/priority_inheritance.c
     ${PROJECT_SOURCE_DIR}/kernel/mutex.c
+    ${PROJECT_SOURCE_DIR}/kernel/fatal.c
+    ${PROJECT_SOURCE_DIR}/kernel/stack_check.c
+    ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c
+    ${PROJECT_SOURCE_DIR}/kernel/trace.c
+    ${PROJECT_SOURCE_DIR}/kernel/invariant_check.c
     ${PROJECT_SOURCE_DIR}/ports/host/port.c
 )
 
@@ -642,6 +677,7 @@ add_test(NAME rts_s32k148_tick_math COMMAND rts_test_s32k148_tick_math)
 
 add_executable(rts_test_s32k148_tick
     unit/test_s32k148_tick.c
+    ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_diagnostics.c
     ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_tick.c
     ${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/target_tick_math.c
     support/s32k148_cmsis_mock/cmsis_mock.c
@@ -787,3 +823,32 @@ endfunction()
 rts_add_mutex_test(rts_test_mutex tests/config)
 rts_add_mutex_test(rts_test_mutex_release tests/config_release)
 rts_add_mutex_test(rts_test_mutex_no_slicing tests/config_no_slicing)
+
+function(rts_add_diagnostics_test target config_directory)
+    add_executable(${target}
+        unit/test_diagnostics.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+        ${PROJECT_SOURCE_DIR}/kernel/time.c
+        ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_diagnostics_test(rts_test_diagnostics tests/config)
+rts_add_diagnostics_test(rts_test_diagnostics_release tests/config_release)
+rts_add_diagnostics_test(rts_test_diagnostics_no_slicing tests/config_no_slicing)

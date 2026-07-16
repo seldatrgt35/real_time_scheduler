@@ -6,6 +6,7 @@
 
 #include "assert_internal.h"
 #include "port_internal.h"
+#include "scheduler_internal.h"
 
 #define RTS_HOST_FRAME_STORAGE_BYTES                                      \
     ((((sizeof(rts_host_initial_frame_t)) + RTS_TASK_STACK_ALIGNMENT - 1u) / \
@@ -201,6 +202,16 @@ bool rts_port_is_in_isr(void)
     return rts_host_in_isr;
 }
 
+uint32_t rts_port_exception_number(void)
+{
+    return rts_host_in_isr ? UINT32_C(1) : UINT32_C(0);
+}
+
+void rts_port_fatal_disable(void)
+{
+    rts_host_interrupts_masked = true;
+}
+
 void rts_port_request_context_switch(void)
 {
     RTS_ASSERT(rts_host_switch_request_count < SIZE_MAX);
@@ -255,10 +266,8 @@ bool rts_port_tick_commit_start(void)
 
 void rts_host_port_task_return_trap(void)
 {
-    RTS_FATAL_UNLESS(false);
-    for (;;)
-    {
-    }
+    RTS_KERNEL_FATAL(RTS_FATAL_TASK_RETURNED,
+                     rts_kernel_state_get()->current_task);
 }
 
 void rts_host_port_test_reset(void)

@@ -7,6 +7,8 @@
 #include "rts/rts_semaphore.h"
 #include "scheduler_internal.h"
 #include "wait_object_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 static rts_wait_object_storage_t *rts_priority_waiters_for(rts_tcb_t *task)
 {
@@ -44,7 +46,22 @@ bool rts_priority_set_effective(rts_tcb_t *task,
     {
         rts_ready_remove(&kernel->ready_set, task);
     }
-    task->priority = effective_priority;
+    {
+        rts_priority_t previous = task->priority;
+        task->priority = effective_priority;
+#if RTS_ENABLE_RUNTIME_STATS
+        if (effective_priority > previous)
+        {
+            RTS_DIAG_COUNTER_INC(kernel->runtime_counters.priority_raises);
+        }
+        else
+        {
+            RTS_DIAG_COUNTER_INC(kernel->runtime_counters.priority_restorations);
+        }
+#endif
+        RTS_TRACE(RTS_TRACE_PRIORITY, previous, effective_priority);
+        (void)previous;
+    }
     if (ready_linked)
     {
         rts_ready_insert(&kernel->ready_set, task);

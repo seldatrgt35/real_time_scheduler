@@ -86,8 +86,6 @@ rts_status_t rts_port_start_first_task(void)
 
 _Noreturn void rts_cm4f_start_fatal(void)
 {
-    RTS_FATAL_UNLESS(false);
-    for (;;)
-    {
-    }
+    RTS_KERNEL_FATAL(RTS_FATAL_CONTEXT_CORRUPTION,
+                     rts_kernel_state_get()->current_task);
 }

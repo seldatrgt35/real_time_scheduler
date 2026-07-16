@@ -7,7 +7,7 @@
 
 static bool rts_task_stack_is_valid(const rts_task_config_t *config)
 {
-    const size_t minimum_size = rts_port_task_stack_minimum_size_bytes();
+    size_t minimum_size = rts_port_task_stack_minimum_size_bytes();
     const size_t size_granularity =
         rts_port_task_stack_size_granularity_bytes();
     const uintptr_t stack_start = (uintptr_t)config->stack_buffer;
@@ -19,6 +19,13 @@ static bool rts_task_stack_is_valid(const rts_task_config_t *config)
     {
         return false;
     }
+#if RTS_ENABLE_STACK_GUARDS
+    if (minimum_size > SIZE_MAX - (size_t)RTS_STACK_GUARD_SIZE_BYTES)
+    {
+        return false;
+    }
+    minimum_size += (size_t)RTS_STACK_GUARD_SIZE_BYTES;
+#endif
 
     if (config->stack_buffer == NULL || config->stack_size_bytes == 0u ||
         (stack_start % (uintptr_t)RTS_TASK_STACK_ALIGNMENT) != 0u ||

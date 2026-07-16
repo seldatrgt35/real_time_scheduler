@@ -9,6 +9,8 @@
 #include "priority_internal.h"
 #include "time_internal.h"
 #include "wait_object_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 bool rts_mutex_is_valid(const rts_mutex_t *mutex)
 {
@@ -246,6 +248,11 @@ rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout)
                                   : 0u;
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     current->state = RTS_TASK_STATE_BLOCKED;
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.mutex_blocks);
+    RTS_DIAG_COUNTER_INC(current->diagnostic_block_count);
+#endif
+    RTS_TRACE(RTS_TRACE_MUTEX, RTS_WAIT_MUTEX, current->priority);
     rts_wait_object_insert(&mutex->waiters, current);
     if (current->wait.timeout_active)
     {
@@ -292,6 +299,10 @@ static rts_tcb_t *rts_mutex_handoff(rts_kernel_state_t *kernel,
                         ? RTS_TASK_STATE_RUNNING
                         : RTS_TASK_STATE_READY;
     rts_ready_insert(&kernel->ready_set, waiter);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.mutex_handoffs);
+    RTS_DIAG_COUNTER_INC(waiter->diagnostic_wake_count);
+#endif
     return waiter;
 }
 
@@ -374,6 +385,10 @@ bool rts_mutex_timeout_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
     task->state = still_executing ? RTS_TASK_STATE_RUNNING
                                   : RTS_TASK_STATE_READY;
     rts_ready_insert(&kernel->ready_set, task);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.mutex_timeouts);
+    RTS_DIAG_COUNTER_INC(task->diagnostic_wake_count);
+#endif
     RTS_FATAL_UNLESS(rts_priority_recompute_chain(owner));
     return true;
 }

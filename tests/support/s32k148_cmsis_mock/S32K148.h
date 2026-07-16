@@ -9,6 +9,15 @@
 #define SysTick_CTRL_CLKSOURCE_Msk (UINT32_C(1) << 2)
 #define CONTROL_SPSEL_Msk          (UINT32_C(1) << 1)
 #define CONTROL_FPCA_Msk           (UINT32_C(1) << 2)
+#define SCB_ICSR_NMIPENDSET_Msk    (UINT32_C(1) << 31)
+#define SCB_ICSR_PENDSVCLR_Msk     (UINT32_C(1) << 27)
+#define SCB_CCR_STKALIGN_Msk       (UINT32_C(1) << 9)
+#define SCB_CPACR_CP10_Msk         (UINT32_C(3) << 20)
+#define SCB_CPACR_CP11_Msk         (UINT32_C(3) << 22)
+#define FPU_FPCCR_LSPEN_Msk        (UINT32_C(1) << 30)
+#define FPU_FPCCR_ASPEN_Msk        (UINT32_C(1) << 31)
+#define CoreDebug_DEMCR_TRCENA_Msk (UINT32_C(1) << 24)
+#define DWT_CTRL_CYCCNTENA_Msk     (UINT32_C(1) << 0)
 
 typedef struct
 {
@@ -22,10 +31,30 @@ typedef struct
 {
     volatile uint32_t CPUID, ICSR, VTOR, AIRCR, SCR, CCR;
     volatile uint8_t SHP[12];
+    volatile uint32_t SHCSR, CFSR, HFSR, DFSR, MMFAR, BFAR, CPACR;
 } SCB_Type;
+
+typedef struct
+{
+    volatile uint32_t FPCCR;
+} FPU_Type;
+
+typedef struct
+{
+    volatile uint32_t CTRL;
+    volatile uint32_t CYCCNT;
+} DWT_Type;
+
+typedef struct
+{
+    volatile uint32_t DEMCR;
+} CoreDebug_Type;
 
 extern SysTick_Type rts_test_systick;
 extern SCB_Type rts_test_scb;
+extern FPU_Type rts_test_fpu;
+extern DWT_Type rts_test_dwt;
+extern CoreDebug_Type rts_test_core_debug;
 extern uint32_t rts_test_primask;
 extern uint32_t rts_test_ipsr;
 extern uint32_t rts_test_psp;
@@ -36,6 +65,9 @@ extern unsigned int rts_test_isb_count;
 
 #define SysTick (&rts_test_systick)
 #define SCB (&rts_test_scb)
+#define FPU (&rts_test_fpu)
+#define DWT (&rts_test_dwt)
+#define CoreDebug (&rts_test_core_debug)
 
 static inline uint32_t __get_PRIMASK(void)
 {
@@ -70,6 +102,21 @@ static inline void __DSB(void)
 static inline void __ISB(void)
 {
     ++rts_test_isb_count;
+}
+
+static inline void __disable_irq(void)
+{
+    rts_test_primask = 1u;
+}
+
+static inline void __enable_irq(void)
+{
+    rts_test_primask = 0u;
+}
+
+static inline void __set_PRIMASK(uint32_t value)
+{
+    rts_test_primask = value & 1u;
 }
 
 #endif /* RTS_TEST_S32K148_CMSIS_MOCK_H */

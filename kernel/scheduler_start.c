@@ -5,6 +5,8 @@
 #include "assert_internal.h"
 #include "port.h"
 #include "scheduler_internal.h"
+#include "diagnostics_internal.h"
+#include "trace_internal.h"
 
 static bool rts_start_preflight_is_coherent(const rts_kernel_state_t *kernel)
 {
@@ -87,6 +89,12 @@ rts_status_t rts_start(void)
     }
 
     kernel->lifecycle = RTS_KERNEL_RUNNING;
+    rts_runtime_task_started(kernel->current_task, kernel->current_tick);
+#if RTS_ENABLE_RUNTIME_STATS
+    RTS_DIAG_COUNTER_INC(kernel->runtime_counters.scheduler_starts);
+#endif
+    RTS_TRACE(RTS_TRACE_SCHEDULER_STARTED,
+              kernel->current_task->priority, 0u);
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
 
     port_status = rts_port_tick_start();

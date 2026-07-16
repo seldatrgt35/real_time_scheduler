@@ -9,8 +9,13 @@
 #include "rts/rts_task.h"
 #include "rts/rts_semaphore.h"
 #include "target.h"
+#include "target_diagnostics.h"
 #include "target_tick.h"
 #include "time_internal.h"
+#include "diagnostics_internal.h"
+#include "invariant_check_internal.h"
+#include "stack_check_internal.h"
+#include "scheduler_internal.h"
 
 #define RTS_SMOKE_STACK_SIZE_BYTES 1024u
 #define RTS_SMOKE_GUARD_SIZE_BYTES 32u
@@ -209,6 +214,58 @@ static void rts_smoke_task(void *argument)
                 task->identifier;
         }
         g_rts_s32k148_smoke_record.observed_tick = rts_kernel_tick_now();
+        if (((*task->counter) & UINT32_C(0xff)) == 0u)
+        {
+            rts_diagnostics_snapshot_t snapshot;
+            rts_tcb_t *current = rts_scheduler_current_get();
+
+            if (!rts_diagnostics_snapshot_read(&snapshot) ||
+                !rts_kernel_validate_all())
+            {
+                g_rts_s32k148_smoke_record.diagnostic_invariant_failure = 1u;
+            }
+            else
+            {
+                g_rts_s32k148_smoke_record.diagnostic_context_switches =
+                    snapshot.context_switches;
+                g_rts_s32k148_smoke_record.diagnostic_idle_ticks =
+                    snapshot.idle_ticks;
+                g_rts_s32k148_smoke_record.diagnostic_non_idle_ticks =
+                    snapshot.non_idle_ticks;
+                g_rts_s32k148_smoke_record.diagnostic_fatal_reason =
+                    snapshot.fatal_reason;
+                g_rts_s32k148_smoke_record.
+                    diagnostic_cycle_counter_available =
+                    g_rts_s32k148_timing_record.cycle_counter_available;
+                g_rts_s32k148_smoke_record.
+                    diagnostic_maximum_critical_cycles =
+                    g_rts_s32k148_timing_record.maximum_critical_cycles;
+            }
+            if (current != NULL)
+            {
+                uint32_t used = (uint32_t)rts_stack_watermark_update(current);
+#if RTS_ENABLE_RUNTIME_STATS
+                uint32_t dispatch = current->diagnostic_dispatch_count;
+#else
+                uint32_t dispatch = 0u;
+#endif
+                if (task == &g_task_a_argument)
+                {
+                    g_rts_s32k148_smoke_record.task_a_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_a_max_stack_used = used;
+                }
+                else if (task == &g_task_b_argument)
+                {
+                    g_rts_s32k148_smoke_record.task_b_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_b_max_stack_used = used;
+                }
+                else
+                {
+                    g_rts_s32k148_smoke_record.task_c_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_c_max_stack_used = used;
+                }
+            }
+        }
         if (task == &g_task_b_argument && !g_low_mutex_locked)
         {
             if (rts_mutex_lock(&g_smoke_mutex, 0u) == RTS_STATUS_OK)
@@ -335,6 +392,7 @@ int main(void)
         .priority = 2u
     };
 
+    rts_s32k148_timing_initialize();
     rts_smoke_guard_initialize(g_task_a_stack);
     rts_smoke_guard_initialize(g_task_b_stack);
     rts_smoke_guard_initialize(g_task_c_stack);

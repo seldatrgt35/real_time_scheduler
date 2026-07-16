@@ -25,6 +25,8 @@ rts_port_stack_result_t rts_port_stack_initialize(void *stack_buffer,
 rts_critical_token_t rts_port_critical_enter(void);
 void rts_port_critical_exit(rts_critical_token_t token);
 bool rts_port_is_in_isr(void);
+uint32_t rts_port_exception_number(void);
+void rts_port_fatal_disable(void);
 void rts_port_request_context_switch(void);
 rts_status_t rts_port_tick_start(void);
 bool rts_port_tick_commit_start(void);
