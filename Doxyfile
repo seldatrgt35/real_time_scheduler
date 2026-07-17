@@ -1,7 +1,7 @@
 PROJECT_NAME           = "Real-Time Scheduler"
 PROJECT_NUMBER         = "1.0.0"
 OUTPUT_DIRECTORY       = build/docs/doxygen
-INPUT                  = README.md include/rts docs/guides docs/release
+INPUT                  = README.md include/rts docs
 FILE_PATTERNS          = *.h *.md
 RECURSIVE              = YES
 USE_MDFILE_AS_MAINPAGE = README.md

@@ -1018,7 +1018,7 @@ endif()
 add_test(NAME rts_power COMMAND rts_test_power)
 
 add_executable(rts_test_power_no_tickless
-    unit/test_power.c
+    unit/test_power_disabled.c
     ${RTS_YIELD_PRODUCTION_SOURCES}
     ${PROJECT_SOURCE_DIR}/kernel/power.c
     ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
