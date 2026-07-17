@@ -4,6 +4,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "power_internal.h"
 #include "scheduler_policy.h"
 #include "scheduler_internal.h"
@@ -134,7 +135,7 @@ rts_status_t rts_init(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_port_stack_result_t stack_result;
-    rts_critical_token_t critical_token;
+    rts_kernel_lock_token_t critical_token;
     rts_status_t port_status;
     bool in_isr;
 
@@ -159,13 +160,13 @@ rts_status_t rts_init(void)
         return RTS_STATUS_INVALID_STATE;
     }
 
-    critical_token = rts_port_critical_enter();
+    critical_token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_RESET)
     {
         rts_status_t status = kernel->lifecycle == RTS_KERNEL_RUNNING
                                   ? RTS_STATUS_ALREADY_STARTED
                                   : RTS_STATUS_ALREADY_INITIALIZED;
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return status;
     }
 
@@ -178,7 +179,7 @@ rts_status_t rts_init(void)
     if (port_status != RTS_STATUS_OK)
     {
         rts_kernel_restore_reset(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
@@ -193,7 +194,7 @@ rts_status_t rts_init(void)
         stack_result.saved_stack_pointer == NULL)
     {
         rts_kernel_restore_reset(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
     kernel->timer_service_task_storage.saved_stack_pointer =
@@ -209,7 +210,7 @@ rts_status_t rts_init(void)
         stack_result.saved_stack_pointer == NULL)
     {
         rts_kernel_restore_reset(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
@@ -218,7 +219,7 @@ rts_status_t rts_init(void)
     if (!rts_policy_insert(&kernel->idle_task_storage))
     {
         rts_kernel_restore_reset(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         RTS_FATAL_UNLESS(false);
         return RTS_STATUS_PORT_ERROR;
     }
@@ -229,6 +230,6 @@ rts_status_t rts_init(void)
     kernel->idle_task = &kernel->idle_task_storage;
     kernel->lifecycle = RTS_KERNEL_INITIALIZED;
 
-    rts_port_critical_exit(critical_token);
+    rts_kernel_lock_exit(critical_token);
     return RTS_STATUS_OK;
 }

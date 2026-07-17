@@ -28,7 +28,7 @@ bool rts_fatal_record_capture(rts_fatal_reason_t reason,
     g_rts_fatal_record.lifecycle = kernel->lifecycle;
     g_rts_fatal_record.tick = kernel->current_tick;
     g_rts_fatal_record.exception_number = rts_port_exception_number();
-    g_rts_fatal_record.current_task = (uintptr_t)kernel->current_task;
+    g_rts_fatal_record.current_task = (uintptr_t)rts_scheduler_current_get();
     g_rts_fatal_record.context = (uintptr_t)context;
     g_rts_fatal_record.source_file = (uintptr_t)file;
     g_rts_fatal_record.source_line = line;

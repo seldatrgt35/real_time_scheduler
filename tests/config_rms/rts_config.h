@@ -2,6 +2,7 @@
 #define RTS_CONFIG_H
 
 #define RTS_MAX_TASKS                 8u
+#define RTS_CPU_COUNT                 1u
 #define RTS_MAX_TIMERS                8u
 #define RTS_TIMER_SERVICE_PRIORITY    63u
 #define RTS_TIMER_SERVICE_STACK_SIZE_BYTES 512u

@@ -30,7 +30,7 @@ static bool rts_tick_expired_task_is_valid(const rts_kernel_state_t *kernel,
 static bool rts_tick_wake_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
 {
     bool valid = rts_tick_expired_task_is_valid(kernel, task);
-    bool still_executing = task == kernel->current_task;
+    bool still_executing = task == rts_scheduler_current_get();
 
     RTS_FATAL_UNLESS(valid);
     if (!valid)
@@ -91,7 +91,7 @@ static bool rts_kernel_time_advance_common(rts_tick_t elapsed_ticks)
         {
             break;
         }
-        if (expired == kernel->current_task)
+        if (expired == rts_scheduler_current_get())
         {
             current_woke = true;
         }
@@ -114,7 +114,7 @@ static bool rts_kernel_time_advance_common(rts_tick_t elapsed_ticks)
         return false;
     }
 
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     RTS_FATAL_UNLESS(current != NULL);
     selected = rts_scheduler_select_highest_ready();
     RTS_FATAL_UNLESS(selected != NULL);

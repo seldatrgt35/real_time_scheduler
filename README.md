@@ -1,10 +1,10 @@
-# Real-Time Scheduler
+# Real-Time Scheduler v1.0.0
 
 A clean, statically allocated real-time scheduler designed from first principles for single-core embedded systems. The project targets the ARM Cortex-M4F architecture and NXP S32K148 while keeping the portable kernel independent of vendor SDKs and device-specific code.
 
 This is an original scheduler design—not a FreeRTOS, Zephyr, RTX, or ThreadX port or clone. Its architecture emphasizes deterministic behavior, explicit ownership, strict C11 conformance, narrow module contracts, and code that remains understandable enough for design review and education.
 
-> **Project status:** Active development. Compile-time FP, RMS, and EDF scheduling, delay/time slicing, synchronization, software timers, diagnostics, and tickless idle are implemented. Cortex-M4F and S32K148 integration is statically verified, but physical target validation is not yet complete. The project is not safety-certified or ready for production deployment.
+> **Project status:** v1.0.0 software release candidate. Compile-time FP, RMS, and EDF scheduling, delay/time slicing, synchronization, software timers, diagnostics, tickless idle, Cortex-M4F, and S32K148 integration are implemented. Final acceptance is conditional because physical S32K148 release evidence is not available. The project is not safety-certified.
 
 ## Design goals
 
@@ -193,6 +193,7 @@ Every build selects exactly one `rts_config.h`. The current private and public c
 | Macro | Purpose |
 | --- | --- |
 | `RTS_MAX_TASKS` | Number of application-task pool slots |
+| `RTS_CPU_COUNT` | Must equal one in v1.0.0; values above one are rejected |
 | `RTS_MAX_TIMERS` | Number of private software-timer pool slots |
 | `RTS_TIMER_SERVICE_PRIORITY` | Fixed priority of the private callback service |
 | `RTS_TIMER_SERVICE_STACK_SIZE_BYTES` | Private callback-service stack bytes |
@@ -263,6 +264,10 @@ tests/unit/                  Focused host unit and contract tests
 tests/config*/               Test configuration variants
 docs/architecture/           Baselines, ADRs, and acceptance reviews
 docs/implementation/         Sprint implementation records
+docs/guides/                 User, kernel, policy, porting, and test guides
+docs/release/                Release notes, limits, compatibility, and evidence
+tools/                       Reproducible release and private-layout audits
+.github/workflows/           Host, ARM syntax, documentation, and static CI
 ```
 
 ## Architecture documentation
@@ -281,6 +286,20 @@ The code is developed against reviewed architecture contracts. Useful starting p
 - [Sprint 10B callback service](docs/implementation/sprint-10b-timer-callback-service.md)
 - [Sprint 10 acceptance review](docs/architecture/sprint-10-acceptance-review.md)
 - [Sprint 11 tickless idle and power architecture](docs/implementation/sprint-11-tickless-idle.md)
+- [Sprint 12 scheduler policy framework](docs/implementation/sprint-12-policy-framework.md)
+- [SMP preparation boundary](docs/architecture/smp-preparation.md)
+- [Sprint 13 final acceptance review](docs/architecture/sprint-13-final-acceptance-review.md)
+- [User guide](docs/guides/user-guide.md)
+- [Kernel developer guide](docs/guides/kernel-developer-guide.md)
+- [Porting guide](docs/guides/porting-guide.md)
+- [Policy guide](docs/guides/policy-guide.md)
+- [Testing guide](docs/guides/testing-guide.md)
+- [S32K148 target integration guide](docs/guides/target-integration-guide.md)
+- [v1.0.0 benchmark and memory report](docs/release/benchmark-report.md)
+- [v1.0.0 public API compatibility](docs/release/public-api-compatibility.md)
+- [v1.0.0 release manifest](docs/release/release-manifest-v1.0.0.md)
+- [v1.0.0 known limitations](docs/release/known-limitations.md)
+- [v1.0.0 release notes](docs/release/release-notes-v1.0.0.md)
 
 The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, and context-switch decisions.
 
@@ -294,13 +313,14 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 - no FPU context support in the current Cortex-M4F execution contract
 - assertions for internal corruption; public status codes for recoverable API errors
 
-## Roadmap
+## Release evidence still required
 
-1. Run the long-duration S32K148 smoke and deliberate fault-capture image.
-2. Measure target stack margins, context-switch latency, and critical windows.
-3. Extend scheduling policy contracts for the planned Sprint 12 EDF/RMS work.
-4. Complete production-readiness and safety-analysis activities before deployment.
+1. Run the FP/RMS/EDF S32K148 hardware matrix and archive debugger/trace evidence.
+2. Run the bounded long-duration target profile and fault-capture checks.
+3. Measure target stack margins, context-switch latency, and PRIMASK windows.
+4. Complete product-specific safety, timing, and tool qualification activities.
 
 ## License
 
-No license has been selected yet. Until a license is added, normal copyright restrictions apply.
+Released under the MIT License. See [LICENSE](LICENSE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

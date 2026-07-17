@@ -2,6 +2,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "task_internal.h"
 #include "stack_check_internal.h"
@@ -26,7 +27,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_port_stack_result_t stack_result;
-    rts_critical_token_t critical_token;
+    rts_kernel_lock_token_t critical_token;
     rts_status_t status;
     rts_tcb_t *task;
     size_t slot_index;
@@ -51,16 +52,16 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
         return status;
     }
 
-    critical_token = rts_port_critical_enter();
+    critical_token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_INITIALIZED)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
     if (!rts_task_pool_reserve(&kernel->application_task_pool, &slot_index))
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_CAPACITY_EXHAUSTED;
     }
 
@@ -70,7 +71,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     if (status != RTS_STATUS_OK)
     {
         rts_task_create_rollback(kernel, task, slot_index);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return status;
     }
 
@@ -86,7 +87,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
                      ? stack_result.status
                      : RTS_STATUS_PORT_ERROR;
         rts_task_create_rollback(kernel, task, slot_index);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return status;
     }
     task->saved_stack_pointer = stack_result.saved_stack_pointer;
@@ -95,7 +96,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     {
         RTS_ASSERT(rts_policy_validate(task, true));
         rts_task_create_rollback(kernel, task, slot_index);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
@@ -106,7 +107,7 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     {
         (void)rts_policy_remove(task);
         rts_task_create_rollback(kernel, task, slot_index);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
@@ -118,6 +119,6 @@ rts_status_t rts_task_create(const rts_task_config_t *config,
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.task_creations);
 #endif
     RTS_TRACE(RTS_TRACE_TASK_CREATED, task->priority, slot_index);
-    rts_port_critical_exit(critical_token);
+    rts_kernel_lock_exit(critical_token);
     return RTS_STATUS_OK;
 }

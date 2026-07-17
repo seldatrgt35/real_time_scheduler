@@ -87,7 +87,7 @@ static bool advance_from_isr(rts_tick_t elapsed)
     notify = rts_kernel_tick_advance(elapsed);
     if (notify)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     rts_host_port_test_set_isr(false);
     return notify;

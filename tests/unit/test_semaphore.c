@@ -84,7 +84,7 @@ static bool advance_from_isr(rts_tick_t elapsed)
     notify = rts_kernel_tick_advance(elapsed);
     if (notify)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     rts_host_port_test_set_isr(false);
     return notify;
@@ -188,7 +188,7 @@ static void test_blocking_forever_and_direct_handoff_order(void)
     CHECK(a->state == RTS_TASK_STATE_READY && a->wait_node.owner == NULL);
     CHECK(!rts_delay_contains(&kernel->delay_queue, a));
     CHECK(rts_host_port_test_switch_request_count() == 3u);
-    rts_port_request_context_switch();
+    rts_port_request_reschedule(rts_cpu_current_id());
     complete_pending_switch();
     CHECK(kernel->current_task == a);
     CHECK(rts_semaphore_wait_result_consume(a) == RTS_STATUS_OK);
@@ -227,7 +227,7 @@ static void test_finite_timeout_wrap_and_race_arbitration(void)
     CHECK(higher_woken);
     CHECK(high->wait.result == RTS_WAIT_RESULT_ACQUIRED);
     CHECK(!rts_delay_contains(&kernel->delay_queue, high));
-    rts_port_request_context_switch();
+    rts_port_request_reschedule(rts_cpu_current_id());
     complete_pending_switch();
     CHECK(rts_semaphore_wait_result_consume(high) == RTS_STATUS_OK);
     CHECK(!advance_from_isr(1u));

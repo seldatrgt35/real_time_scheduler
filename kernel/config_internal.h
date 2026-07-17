@@ -12,6 +12,9 @@
 #endif
 
 #define RTS_APPLICATION_TASK_CAPACITY ((size_t)RTS_MAX_TASKS)
+
+_Static_assert(RTS_CPU_COUNT == 1u,
+               "Version 1 kernel is compile-time specialized for one CPU");
 #define RTS_PRIVATE_TASK_COUNT ((size_t)2u)
 #define RTS_SCHEDULABLE_TASK_CAPACITY \
     (RTS_APPLICATION_TASK_CAPACITY + RTS_PRIVATE_TASK_COUNT)

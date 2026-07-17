@@ -8,6 +8,7 @@
 #include "lifecycle_internal.h"
 #include "ready_queue.h"
 #include "diagnostics_internal.h"
+#include "cpu.h"
 
 typedef struct
 {
@@ -28,6 +29,13 @@ typedef struct
 
 typedef struct
 {
+    rts_tcb_t *current_task;
+    rts_tcb_t *idle_task;
+    rts_switch_plan_t switch_plan;
+} rts_cpu_local_state_t;
+
+typedef struct
+{
     rts_task_pool_t application_task_pool;
     rts_tcb_t idle_task_storage;
     _Alignas(RTS_TASK_STACK_ALIGNMENT)
@@ -37,21 +45,33 @@ typedef struct
     unsigned char timer_service_stack[RTS_TIMER_SERVICE_STACK_SIZE_BYTES];
 
     rts_kernel_lifecycle_t lifecycle;
-    rts_tcb_t *current_task;
-    rts_tcb_t *idle_task;
+    union
+    {
+        rts_cpu_local_state_t cpu_local;
+        struct
+        {
+            rts_tcb_t *current_task;
+            rts_tcb_t *idle_task;
+            rts_switch_plan_t switch_plan;
+        };
+    };
     rts_tcb_t *timer_service_task;
     rts_ready_set_t ready_set;
     rts_list_t edf_ready;
     uint32_t policy_release_sequence;
     rts_delay_queue_t delay_queue;
     rts_tick_t current_tick;
-    rts_switch_plan_t switch_plan;
 #if RTS_ENABLE_RUNTIME_STATS
     rts_runtime_counters_t runtime_counters;
 #endif
 } rts_kernel_state_t;
 
 rts_kernel_state_t *rts_kernel_state_get(void);
+rts_cpu_local_state_t *rts_scheduler_cpu_local(rts_cpu_id_t cpu);
+const rts_cpu_local_state_t *rts_scheduler_cpu_local_const(rts_cpu_id_t cpu);
+rts_tcb_t *rts_scheduler_current_on_cpu(rts_cpu_id_t cpu);
+void rts_scheduler_set_current_on_cpu(rts_cpu_id_t cpu, rts_tcb_t *task);
+rts_switch_plan_t *rts_scheduler_switch_plan_on_cpu(rts_cpu_id_t cpu);
 
 rts_tcb_t *rts_scheduler_select_highest_ready(void);
 bool rts_scheduler_task_is_idle(const rts_tcb_t *task);

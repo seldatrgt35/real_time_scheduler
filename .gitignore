@@ -1,0 +1,5 @@
+/build*/
+/.codex-build*/
+/.codex-tools/
+/*.plist
+/dist/

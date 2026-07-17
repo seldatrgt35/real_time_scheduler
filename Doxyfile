@@ -1,0 +1,16 @@
+PROJECT_NAME           = "Real-Time Scheduler"
+PROJECT_NUMBER         = "1.0.0"
+OUTPUT_DIRECTORY       = build/docs/doxygen
+INPUT                  = include/rts docs/guides docs/release
+FILE_PATTERNS          = *.h *.md
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+MARKDOWN_SUPPORT       = YES
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+HIDE_UNDOC_MEMBERS     = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_AS_ERROR          = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+QUIET                  = YES

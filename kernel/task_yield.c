@@ -4,6 +4,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
@@ -11,7 +12,7 @@
 
 static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
 {
-    const rts_tcb_t *current = kernel->current_task;
+    const rts_tcb_t *current = rts_scheduler_current_get();
 
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            rts_scheduler_current_is_valid() &&
@@ -23,7 +24,7 @@ static bool rts_yield_current_is_coherent(const rts_kernel_state_t *kernel)
 rts_status_t rts_task_yield(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t critical_token;
+    rts_kernel_lock_token_t critical_token;
     rts_tcb_t *current;
     rts_tcb_t *selected;
     bool coherent;
@@ -38,10 +39,10 @@ rts_status_t rts_task_yield(void)
         return RTS_STATUS_INVALID_STATE;
     }
 
-    critical_token = rts_port_critical_enter();
+    critical_token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_RUNNING)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
@@ -49,11 +50,11 @@ rts_status_t rts_task_yield(void)
     RTS_ASSERT(coherent);
     if (!coherent)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     current->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
 #if RTS_ENABLE_RUNTIME_STATS
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.yields);
@@ -61,7 +62,7 @@ rts_status_t rts_task_yield(void)
     RTS_TRACE(RTS_TRACE_YIELD, current->priority, 0u);
     if (!rts_policy_yield(current))
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_OK;
     }
 
@@ -72,16 +73,16 @@ rts_status_t rts_task_yield(void)
     if (selected == NULL || selected == current ||
         selected->state != RTS_TASK_STATE_READY)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
     notify_port = rts_scheduler_prepare_switch(selected);
-    rts_port_critical_exit(critical_token);
+    rts_kernel_lock_exit(critical_token);
 
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     return RTS_STATUS_OK;
 }

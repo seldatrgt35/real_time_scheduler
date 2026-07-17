@@ -4,6 +4,7 @@
 
 #include "diagnostics_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 
 #if RTS_ENABLE_TRACE
@@ -17,7 +18,7 @@ static uint32_t rts_trace_overwrites;
 void rts_trace_emit(rts_trace_event_t event, uintptr_t arg0, uintptr_t arg1)
 {
 #if RTS_ENABLE_TRACE
-    rts_critical_token_t token = rts_port_critical_enter();
+    rts_kernel_lock_token_t token = rts_kernel_lock_enter();
     size_t index;
 
     if (rts_trace_used < (size_t)RTS_TRACE_CAPACITY)
@@ -40,7 +41,7 @@ void rts_trace_emit(rts_trace_event_t event, uintptr_t arg0, uintptr_t arg1)
     rts_trace_buffer[index].argument0 = arg0;
     rts_trace_buffer[index].argument1 = arg1;
     rts_trace_buffer[index].event = event;
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
 #else
     (void)event;
     (void)arg0;
@@ -51,10 +52,10 @@ void rts_trace_emit(rts_trace_event_t event, uintptr_t arg0, uintptr_t arg1)
 size_t rts_trace_count(void)
 {
 #if RTS_ENABLE_TRACE
-    rts_critical_token_t token = rts_port_critical_enter();
+    rts_kernel_lock_token_t token = rts_kernel_lock_enter();
     size_t count = rts_trace_used;
 
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return count;
 #else
     return 0u;
@@ -64,10 +65,10 @@ size_t rts_trace_count(void)
 uint32_t rts_trace_overwrite_count(void)
 {
 #if RTS_ENABLE_TRACE
-    rts_critical_token_t token = rts_port_critical_enter();
+    rts_kernel_lock_token_t token = rts_kernel_lock_enter();
     uint32_t count = rts_trace_overwrites;
 
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return count;
 #else
     return 0u;
@@ -77,22 +78,22 @@ uint32_t rts_trace_overwrite_count(void)
 bool rts_trace_read(size_t oldest_index, rts_trace_entry_t *entry)
 {
 #if RTS_ENABLE_TRACE
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     size_t index;
 
     if (entry == NULL)
     {
         return false;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (oldest_index >= rts_trace_used)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return false;
     }
     index = (rts_trace_head + oldest_index) % (size_t)RTS_TRACE_CAPACITY;
     *entry = rts_trace_buffer[index];
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return true;
 #else
     (void)oldest_index;

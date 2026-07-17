@@ -5,6 +5,7 @@
 #include "assert_internal.h"
 #include "diagnostics_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "trace_internal.h"
 
@@ -15,12 +16,12 @@ bool rts_timer_service_process_one(void)
     rts_timer_callback_work_t work;
     rts_timer_callback_t callback;
     void *argument;
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     bool valid_context;
 
     valid_context = !rts_port_is_in_isr() &&
                     kernel->lifecycle == RTS_KERNEL_RUNNING &&
-                    kernel->current_task == kernel->timer_service_task &&
+                    rts_scheduler_current_get() == kernel->timer_service_task &&
                     kernel->timer_service_task != NULL &&
                     kernel->timer_service_task->state ==
                         RTS_TASK_STATE_RUNNING;
@@ -30,10 +31,10 @@ bool rts_timer_service_process_one(void)
         return false;
     }
 
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (!rts_timer_callback_queue_dequeue(&manager->callback_queue, &work))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return false;
     }
     if (!rts_timer_handle_is_valid(work.timer) ||
@@ -53,7 +54,7 @@ bool rts_timer_service_process_one(void)
 #endif
         RTS_TRACE(RTS_TRACE_TIMER_STALE_CALLBACK, work.generation,
                   work.sequence);
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return true;
     }
 
@@ -63,11 +64,11 @@ bool rts_timer_service_process_one(void)
     RTS_FATAL_UNLESS(callback != NULL);
     RTS_TRACE(RTS_TRACE_TIMER_CALLBACK_BEGIN, work.timer->slot_index,
               work.sequence);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
 
     callback(argument);
 
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     RTS_FATAL_UNLESS(work.timer->callback_state ==
                      RTS_TIMER_CALLBACK_RUNNING);
     work.timer->callback_state = RTS_TIMER_CALLBACK_IDLE;
@@ -78,7 +79,7 @@ bool rts_timer_service_process_one(void)
     RTS_TRACE(RTS_TRACE_TIMER_CALLBACK_END, work.timer->slot_index,
               work.sequence);
     RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return true;
 }
 
@@ -98,23 +99,23 @@ void rts_timer_service_entry(void *argument)
     (void)argument;
     for (;;)
     {
-        rts_critical_token_t token;
+        rts_kernel_lock_token_t token;
         bool notify_port;
 
         (void)rts_timer_service_drain();
-        token = rts_port_critical_enter();
+        token = rts_kernel_lock_enter();
         if (rts_timer_manager_get()->callback_queue.count != 0u)
         {
-            rts_port_critical_exit(token);
+            rts_kernel_lock_exit(token);
             continue;
         }
         notify_port = rts_scheduler_timer_service_block();
         RTS_FATAL_UNLESS(rts_kernel_state_get()->timer_service_task->state ==
                          RTS_TASK_STATE_BLOCKED);
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         if (notify_port)
         {
-            rts_port_request_context_switch();
+            rts_port_request_reschedule(rts_cpu_current_id());
         }
     }
 }

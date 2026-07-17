@@ -15,19 +15,19 @@ rts_cm4f_start_trigger:
     b       rts_cm4f_start_fatal
     .size rts_cm4f_start_trigger, .-rts_cm4f_start_trigger
 
-    .section .text.rts_port_request_context_switch, "ax", %progbits
+    .section .text.rts_cm4f_pend_context_switch, "ax", %progbits
     .align 2
-    .global rts_port_request_context_switch
-    .type rts_port_request_context_switch, %function
+    .global rts_cm4f_pend_context_switch
+    .type rts_cm4f_pend_context_switch, %function
     .thumb_func
-rts_port_request_context_switch:
+rts_cm4f_pend_context_switch:
     ldr     r0, =RTS_CM4F_SCB_ICSR_ADDRESS
     ldr     r1, =RTS_CM4F_SCB_ICSR_PENDSVSET
     str     r1, [r0]
     dsb
     isb
     bx      lr
-    .size rts_port_request_context_switch, .-rts_port_request_context_switch
+    .size rts_cm4f_pend_context_switch, .-rts_cm4f_pend_context_switch
 
     .section .text.SVC_Handler, "ax", %progbits
     .align 2

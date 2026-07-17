@@ -44,8 +44,9 @@ bool rts_kernel_tick_advance(rts_tick_t elapsed_ticks)
     return tick_notification_required;
 }
 
-void rts_port_request_context_switch(void)
+void rts_port_request_reschedule(rts_cpu_id_t cpu)
 {
+    CHECK(rts_cpu_id_is_valid(cpu));
     ++switch_request_count;
 }
 

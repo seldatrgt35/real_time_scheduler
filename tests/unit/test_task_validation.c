@@ -6,6 +6,12 @@
 
 #define TEST_STACK_MINIMUM_BYTES 128u
 #define TEST_STACK_GRANULARITY   16u
+#if RTS_ENABLE_STACK_GUARDS
+#define TEST_VALID_STACK_BYTES \
+    (TEST_STACK_MINIMUM_BYTES + RTS_STACK_GUARD_SIZE_BYTES)
+#else
+#define TEST_VALID_STACK_BYTES TEST_STACK_MINIMUM_BYTES
+#endif
 
 static int test_failures;
 static unsigned int assertion_count;
@@ -47,7 +53,7 @@ static void test_entry(void *argument)
 static rts_task_config_t valid_config(void)
 {
     static _Alignas(RTS_TASK_STACK_ALIGNMENT)
-        unsigned char stack[TEST_STACK_MINIMUM_BYTES];
+        unsigned char stack[TEST_VALID_STACK_BYTES];
     rts_task_config_t config = {
         .entry = test_entry,
         .argument = NULL,

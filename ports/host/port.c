@@ -218,8 +218,13 @@ void rts_port_fatal_disable(void)
     rts_host_interrupts_masked = true;
 }
 
-void rts_port_request_context_switch(void)
+void rts_port_request_reschedule(rts_cpu_id_t cpu)
 {
+    RTS_ASSERT(rts_cpu_id_is_valid(cpu));
+    if (!rts_cpu_id_is_valid(cpu))
+    {
+        return;
+    }
     RTS_ASSERT(rts_host_switch_request_count < SIZE_MAX);
     if (rts_host_switch_request_count == SIZE_MAX)
     {
@@ -312,7 +317,7 @@ bool rts_port_tick_commit_start(void)
 void rts_host_port_task_return_trap(void)
 {
     RTS_KERNEL_FATAL(RTS_FATAL_TASK_RETURNED,
-                     rts_kernel_state_get()->current_task);
+                     rts_scheduler_current_get());
 }
 
 void rts_host_port_test_reset(void)

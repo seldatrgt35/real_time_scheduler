@@ -25,6 +25,7 @@ static bool rts_scheduler_task_is_runnable_in(
     const rts_kernel_state_t *kernel,
     const rts_tcb_t *task)
 {
+    (void)kernel;
     bool identity_is_valid;
     bool state_is_valid;
 
@@ -59,7 +60,7 @@ static bool rts_scheduler_task_is_runnable_in(
     }
 
     state_is_valid = task->state == RTS_TASK_STATE_READY ||
-                     (task == kernel->current_task &&
+                     (task == rts_scheduler_current_get() &&
                       task->state == RTS_TASK_STATE_RUNNING);
 
     if (!identity_is_valid || !state_is_valid ||
@@ -204,14 +205,14 @@ rts_tcb_t *rts_scheduler_select_highest_ready(void)
 
 rts_tcb_t *rts_scheduler_current_get(void)
 {
-    return rts_kernel_state_get()->current_task;
+    return rts_scheduler_current_on_cpu(rts_cpu_current_id());
 }
 
 bool rts_scheduler_current_is_valid(void)
 {
     const rts_kernel_state_t *kernel = rts_kernel_state_get();
 
-    if (kernel->current_task == NULL)
+    if (rts_scheduler_current_get() == NULL)
     {
         return kernel->lifecycle == RTS_KERNEL_RESET ||
                kernel->lifecycle == RTS_KERNEL_INITIALIZED;
@@ -219,8 +220,8 @@ bool rts_scheduler_current_is_valid(void)
 
     return (kernel->lifecycle == RTS_KERNEL_INITIALIZED ||
             kernel->lifecycle == RTS_KERNEL_RUNNING) &&
-           kernel->current_task->state == RTS_TASK_STATE_RUNNING &&
-           rts_scheduler_task_is_runnable_in(kernel, kernel->current_task);
+           rts_scheduler_current_get()->state == RTS_TASK_STATE_RUNNING &&
+           rts_scheduler_task_is_runnable_in(kernel, rts_scheduler_current_get());
 }
 
 bool rts_scheduler_current_establish(rts_tcb_t *task)
@@ -229,10 +230,10 @@ bool rts_scheduler_current_establish(rts_tcb_t *task)
     rts_tcb_t *selected;
 
     RTS_ASSERT(kernel->lifecycle == RTS_KERNEL_INITIALIZED);
-    RTS_ASSERT(kernel->current_task == NULL);
+    RTS_ASSERT(rts_scheduler_current_get() == NULL);
     RTS_ASSERT(task != NULL);
     if (kernel->lifecycle != RTS_KERNEL_INITIALIZED ||
-        kernel->current_task != NULL || task == NULL)
+        rts_scheduler_current_get() != NULL || task == NULL)
     {
         return false;
     }
@@ -247,7 +248,7 @@ bool rts_scheduler_current_establish(rts_tcb_t *task)
 
     task->state = RTS_TASK_STATE_RUNNING;
     task->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
-    kernel->current_task = task;
+    rts_scheduler_set_current_on_cpu(rts_cpu_current_id(), task);
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
     return rts_scheduler_current_is_valid();
 }
@@ -255,7 +256,7 @@ bool rts_scheduler_current_establish(rts_tcb_t *task)
 bool rts_scheduler_current_release_initial(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_tcb_t *current = kernel->current_task;
+    rts_tcb_t *current = rts_scheduler_current_get();
 
     RTS_ASSERT(kernel->lifecycle == RTS_KERNEL_INITIALIZED);
     RTS_ASSERT(current != NULL);
@@ -267,7 +268,7 @@ bool rts_scheduler_current_release_initial(void)
     }
 
     current->state = RTS_TASK_STATE_READY;
-    kernel->current_task = NULL;
+    rts_scheduler_set_current_on_cpu(rts_cpu_current_id(), NULL);
     RTS_FATAL_UNLESS(rts_policy_validate(current, true));
     return rts_policy_validate(current, true) &&
            rts_scheduler_current_is_valid();
@@ -303,7 +304,7 @@ bool rts_scheduler_timer_service_block(void)
     rts_tcb_t *service = kernel->timer_service_task;
     rts_tcb_t *selected;
 
-    if (service == NULL || kernel->current_task != service ||
+    if (service == NULL || rts_scheduler_current_get() != service ||
         service->state != RTS_TASK_STATE_RUNNING ||
         !rts_policy_validate(service, true) ||
         service->wait.reason != RTS_WAIT_NONE)
@@ -337,7 +338,7 @@ void rts_scheduler_timer_service_cancel_wake(void)
     }
     if (kernel->switch_plan.pending && kernel->switch_plan.to == service)
     {
-        (void)rts_scheduler_prepare_switch(kernel->current_task);
+        (void)rts_scheduler_prepare_switch(rts_scheduler_current_get());
     }
     RTS_FATAL_UNLESS(rts_policy_task_block(service));
     service->wait.reason = RTS_WAIT_TIMER_SERVICE;

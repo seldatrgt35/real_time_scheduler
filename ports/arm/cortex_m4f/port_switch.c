@@ -9,6 +9,17 @@
 
 static rts_cm4f_switch_handoff_t rts_cm4f_switch_handoff;
 
+#if !defined(RTS_CM4F_TEST_EXTERNAL_RESCHEDULE_REQUEST)
+void rts_port_request_reschedule(rts_cpu_id_t cpu)
+{
+    RTS_ASSERT(rts_cpu_id_is_valid(cpu));
+    if (rts_cpu_id_is_valid(cpu))
+    {
+        rts_cm4f_pend_context_switch();
+    }
+}
+#endif
+
 static bool rts_cm4f_saved_sp_is_valid(const rts_tcb_t *task,
                                        const void *saved_stack_pointer)
 {
@@ -49,7 +60,7 @@ const rts_cm4f_switch_handoff_t *rts_cm4f_switch_bridge_acquire(
         return NULL;
     }
 
-    valid = snapshot.from == kernel->current_task &&
+    valid = snapshot.from == rts_scheduler_current_get() &&
             snapshot.from != NULL && snapshot.to != NULL &&
             snapshot.from != snapshot.to &&
             (snapshot.from->state == RTS_TASK_STATE_RUNNING ||
@@ -92,7 +103,7 @@ bool rts_cm4f_switch_bridge_complete(
                  !kernel->switch_plan.pending &&
                  handoff->from == handoff->snapshot.from &&
                  handoff->to == handoff->snapshot.to &&
-                 handoff->from == kernel->current_task &&
+                 handoff->from == rts_scheduler_current_get() &&
                  handoff->from->saved_stack_pointer ==
                      handoff->outgoing_saved_stack_pointer &&
                  handoff->to->saved_stack_pointer ==
@@ -108,10 +119,10 @@ bool rts_cm4f_switch_bridge_complete(
     notify_port = rts_scheduler_reselect_after_switch();
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     valid = !kernel->switch_plan.active &&
-            kernel->current_task == handoff->to &&
+            rts_scheduler_current_get() == handoff->to &&
             (handoff->from->state == RTS_TASK_STATE_READY ||
              handoff->from->state == RTS_TASK_STATE_BLOCKED) &&
             handoff->to->state == RTS_TASK_STATE_RUNNING;

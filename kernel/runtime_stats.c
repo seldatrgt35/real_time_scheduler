@@ -4,6 +4,7 @@
 
 #include "fatal_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 
 uint32_t rts_diagnostic_counter_increment(uint32_t value)
@@ -49,7 +50,7 @@ bool rts_diagnostics_snapshot_read(rts_diagnostics_snapshot_t *snapshot)
 {
 #if RTS_ENABLE_DIAGNOSTICS
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     uint32_t idle_ticks = 0u;
     uint32_t total_ticks;
 
@@ -57,12 +58,13 @@ bool rts_diagnostics_snapshot_read(rts_diagnostics_snapshot_t *snapshot)
     {
         return false;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
 #if RTS_ENABLE_RUNTIME_STATS
     idle_ticks = kernel->idle_task == NULL
                      ? 0u
                      : kernel->idle_task->diagnostic_running_ticks;
-    if (kernel->current_task == kernel->idle_task &&
+    if (kernel->idle_task != NULL &&
+        rts_scheduler_current_get() == kernel->idle_task &&
         kernel->lifecycle == RTS_KERNEL_RUNNING)
     {
         idle_ticks += kernel->current_tick -
@@ -94,7 +96,7 @@ bool rts_diagnostics_snapshot_read(rts_diagnostics_snapshot_t *snapshot)
     snapshot->idle_ticks = idle_ticks;
     snapshot->non_idle_ticks = total_ticks - idle_ticks;
     snapshot->fatal_reason = g_rts_fatal_record.reason;
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return true;
 #else
     (void)snapshot;

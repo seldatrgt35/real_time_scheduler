@@ -29,7 +29,7 @@ static bool rts_task_membership_is_valid(const rts_kernel_state_t *kernel,
     }
     if (task->state == RTS_TASK_STATE_RUNNING)
     {
-        return task == kernel->current_task && ready && !delayed && !waiting &&
+        return task == rts_scheduler_current_get() && ready && !delayed && !waiting &&
                task->wait.reason == RTS_WAIT_NONE;
     }
     if (task->state != RTS_TASK_STATE_BLOCKED || ready)
@@ -105,7 +105,7 @@ bool rts_scheduler_validate_internal(void)
 
     if (kernel->lifecycle == RTS_KERNEL_RESET)
     {
-        return kernel->current_task == NULL && kernel->idle_task == NULL &&
+        return rts_scheduler_current_get() == NULL && kernel->idle_task == NULL &&
                kernel->timer_service_task == NULL &&
                kernel->application_task_pool.allocated_count == 0u;
     }
@@ -146,18 +146,18 @@ bool rts_scheduler_validate_internal(void)
         return false;
     }
     if (kernel->lifecycle == RTS_KERNEL_RUNNING &&
-        kernel->current_task == NULL)
+        rts_scheduler_current_get() == NULL)
     {
         return false;
     }
     if (kernel->lifecycle == RTS_KERNEL_RUNNING &&
-        kernel->current_task->state != RTS_TASK_STATE_RUNNING)
+        rts_scheduler_current_get()->state != RTS_TASK_STATE_RUNNING)
     {
         bool blocked_switch =
-            kernel->current_task->state == RTS_TASK_STATE_BLOCKED &&
+            rts_scheduler_current_get()->state == RTS_TASK_STATE_BLOCKED &&
             (kernel->switch_plan.pending || kernel->switch_plan.active) &&
-            (rts_scheduler_task_is_blocked_delay(kernel->current_task) ||
-             rts_scheduler_task_is_blocked_wait(kernel->current_task));
+            (rts_scheduler_task_is_blocked_delay(rts_scheduler_current_get()) ||
+             rts_scheduler_task_is_blocked_wait(rts_scheduler_current_get()));
 
         if (!blocked_switch)
         {

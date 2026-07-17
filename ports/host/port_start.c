@@ -15,7 +15,7 @@ static bool rts_host_fail_next_start;
 rts_status_t rts_port_start_first_task(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_tcb_t *task = kernel->current_task;
+    rts_tcb_t *task = rts_scheduler_current_get();
 
     if (rts_host_start_request_count != 0u ||
         kernel->lifecycle != RTS_KERNEL_RUNNING || task == NULL ||

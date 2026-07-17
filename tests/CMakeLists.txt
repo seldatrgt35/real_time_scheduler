@@ -297,6 +297,7 @@ add_test(NAME rts_host_first_task_start COMMAND rts_test_host_first_task_start)
 
 add_library(rts_kernel_state STATIC
     ${PROJECT_SOURCE_DIR}/kernel/kernel_state.c
+    ${PROJECT_SOURCE_DIR}/kernel/cpu_local.c
 )
 
 target_include_directories(rts_kernel_state
@@ -577,6 +578,7 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/task_handle.c
     ${PROJECT_SOURCE_DIR}/kernel/task_create.c
     ${PROJECT_SOURCE_DIR}/kernel/kernel_state.c
+    ${PROJECT_SOURCE_DIR}/kernel/cpu_local.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_init.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_select.c
     ${PROJECT_SOURCE_DIR}/kernel/switch_plan.c
@@ -594,7 +596,6 @@ set(RTS_YIELD_PRODUCTION_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/runtime_stats.c
     ${PROJECT_SOURCE_DIR}/kernel/trace.c
     ${PROJECT_SOURCE_DIR}/kernel/invariant_check.c
-    ${PROJECT_SOURCE_DIR}/kernel/power.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_policy.c
     ${PROJECT_SOURCE_DIR}/kernel/policy_fixed_priority.c
     ${PROJECT_SOURCE_DIR}/kernel/policy_rms.c
@@ -606,6 +607,7 @@ function(rts_add_scheduler_policy_test target config_directory)
     add_executable(${target}
         unit/test_scheduler_policy.c
         ${RTS_YIELD_PRODUCTION_SOURCES}
+        ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
     )
     target_include_directories(${target} PRIVATE
         ${PROJECT_SOURCE_DIR}/${config_directory}
@@ -626,6 +628,50 @@ endfunction()
 rts_add_scheduler_policy_test(rts_test_policy_fp tests/config)
 rts_add_scheduler_policy_test(rts_test_policy_rms tests/config_rms)
 rts_add_scheduler_policy_test(rts_test_policy_edf tests/config_edf)
+
+function(rts_add_policy_stress_test target config_directory)
+    add_executable(${target}
+        unit/test_policy_stress.c
+        ${RTS_YIELD_PRODUCTION_SOURCES}
+    )
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/${config_directory}
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/host
+    )
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic
+            -Wconversion -Wsign-conversion -Wshadow)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX)
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+rts_add_policy_stress_test(rts_test_policy_stress_fp tests/config)
+rts_add_policy_stress_test(rts_test_policy_stress_rms tests/config_rms)
+rts_add_policy_stress_test(rts_test_policy_stress_edf tests/config_edf)
+
+add_executable(rts_test_smp_boundary
+    unit/test_smp_boundary.c
+    ${RTS_YIELD_PRODUCTION_SOURCES}
+)
+target_include_directories(rts_test_smp_boundary PRIVATE
+    ${PROJECT_SOURCE_DIR}/tests/config
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/kernel
+    ${PROJECT_SOURCE_DIR}/ports/host
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(rts_test_smp_boundary PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
+elseif(MSVC)
+    target_compile_options(rts_test_smp_boundary PRIVATE /W4 /WX)
+endif()
+add_test(NAME rts_smp_boundary COMMAND rts_test_smp_boundary)
 
 function(rts_add_yield_test target config_directory)
     add_executable(${target}
@@ -666,6 +712,8 @@ target_include_directories(rts_test_cortex_m4f_switch_bridge PRIVATE
     ${PROJECT_SOURCE_DIR}/ports/host
     ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
 )
+target_compile_definitions(rts_test_cortex_m4f_switch_bridge PRIVATE
+    RTS_CM4F_TEST_EXTERNAL_RESCHEDULE_REQUEST=1)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(rts_test_cortex_m4f_switch_bridge PRIVATE
         -Wall -Wextra -Werror -Wpedantic
@@ -948,6 +996,7 @@ rts_add_timer_test(rts_test_timer_no_slicing tests/config_no_slicing)
 add_executable(rts_test_power
     unit/test_power.c
     ${RTS_YIELD_PRODUCTION_SOURCES}
+    ${PROJECT_SOURCE_DIR}/kernel/power.c
     ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
     ${PROJECT_SOURCE_DIR}/kernel/time.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
@@ -967,6 +1016,30 @@ elseif(MSVC)
     target_compile_options(rts_test_power PRIVATE /W4 /WX)
 endif()
 add_test(NAME rts_power COMMAND rts_test_power)
+
+add_executable(rts_test_power_no_tickless
+    unit/test_power.c
+    ${RTS_YIELD_PRODUCTION_SOURCES}
+    ${PROJECT_SOURCE_DIR}/kernel/power.c
+    ${PROJECT_SOURCE_DIR}/kernel/task_delay.c
+    ${PROJECT_SOURCE_DIR}/kernel/time.c
+    ${PROJECT_SOURCE_DIR}/kernel/scheduler_start.c
+    ${PROJECT_SOURCE_DIR}/ports/host/port_start.c
+)
+target_include_directories(rts_test_power_no_tickless PRIVATE
+    ${PROJECT_SOURCE_DIR}/tests/config_no_tickless
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/kernel
+    ${PROJECT_SOURCE_DIR}/ports/host
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(rts_test_power_no_tickless PRIVATE
+        -Wall -Wextra -Werror -Wpedantic
+        -Wconversion -Wsign-conversion -Wshadow)
+elseif(MSVC)
+    target_compile_options(rts_test_power_no_tickless PRIVATE /W4 /WX)
+endif()
+add_test(NAME rts_power_no_tickless COMMAND rts_test_power_no_tickless)
 
 add_executable(rts_test_s32k148_power
     unit/test_s32k148_power.c

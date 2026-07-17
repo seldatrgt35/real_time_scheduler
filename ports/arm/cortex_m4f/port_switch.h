@@ -21,3 +21,4 @@ bool rts_cm4f_switch_bridge_complete(
     const rts_cm4f_switch_handoff_t *handoff);
 
 #endif /* RTS_CORTEX_M4F_PORT_SWITCH_H */
+void rts_cm4f_pend_context_switch(void);

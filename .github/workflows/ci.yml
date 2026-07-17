@@ -1,0 +1,62 @@
+name: release-verification
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host:
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        env:
+          CC: ${{ matrix.compiler }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Release source audit
+        run: python3 tools/release_audit.py
+
+  arm-clang-policy-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: [config, config_rms, config_edf]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile policy and TCB contracts for Cortex-M4
+        run: >-
+          clang --target=arm-none-eabi -mcpu=cortex-m4 -mthumb
+          -mfloat-abi=soft -std=c11 -Wall -Wextra -Werror -Wpedantic
+          -ffreestanding -fno-builtin -fsyntax-only
+          -Itargets/nxp/s32k148/${{ matrix.config }} -Iinclude -Ikernel
+          kernel/intrusive_list.c kernel/ready_queue.c kernel/kernel_state.c
+          kernel/cpu_local.c kernel/scheduler_policy.c
+          kernel/policy_fixed_priority.c kernel/policy_rms.c
+          kernel/policy_edf.c kernel/task_object.c
+
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y doxygen
+      - run: doxygen Doxyfile
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - run: >-
+          cppcheck --enable=warning,performance,portability
+          --error-exitcode=1 --std=c11
+          -Iinclude -Ikernel -Itests/config kernel ports/host
+      - run: python3 tools/release_audit.py

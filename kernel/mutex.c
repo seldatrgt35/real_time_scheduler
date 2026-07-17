@@ -6,6 +6,7 @@
 #include "assert_internal.h"
 #include "mutex_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "priority_internal.h"
 #include "time_internal.h"
 #include "wait_object_internal.h"
@@ -84,6 +85,10 @@ static void rts_mutex_owner_unlink(rts_mutex_t *mutex)
     rts_tcb_t *owner = mutex->owner;
 
     RTS_FATAL_UNLESS(owner != NULL);
+    if (owner == NULL)
+    {
+        return;
+    }
     if (mutex->owned_previous == NULL)
     {
         RTS_FATAL_UNLESS(owner->owned_mutex_head == mutex);
@@ -111,7 +116,7 @@ static void rts_mutex_owner_unlink(rts_mutex_t *mutex)
 
 static bool rts_mutex_current_can_block(const rts_kernel_state_t *kernel)
 {
-    const rts_tcb_t *current = kernel->current_task;
+    const rts_tcb_t *current = rts_scheduler_current_get();
 
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            !rts_scheduler_task_is_idle(current) &&
@@ -150,8 +155,9 @@ static bool rts_mutex_would_cycle(const rts_tcb_t *current,
 
 static bool rts_mutex_plan_final(rts_kernel_state_t *kernel)
 {
+    (void)kernel;
     rts_tcb_t *selected = rts_scheduler_select_highest_ready();
-    rts_tcb_t *current = kernel->current_task;
+    rts_tcb_t *current = rts_scheduler_current_get();
 
     RTS_FATAL_UNLESS(selected != NULL && current != NULL);
     if (selected == NULL || current == NULL)
@@ -173,7 +179,7 @@ static bool rts_mutex_plan_final(rts_kernel_state_t *kernel)
 rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     rts_tcb_t *current;
     rts_tcb_t *selected;
     bool notify_port;
@@ -191,55 +197,55 @@ rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout)
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (!rts_mutex_is_valid(mutex))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_ARGUMENT;
     }
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     if (mutex->owner == NULL)
     {
         RTS_FATAL_UNLESS(mutex->waiters.count == 0u);
         if (current->owned_mutex_count >=
             (size_t)RTS_MAX_MUTEXES_PER_TASK)
         {
-            rts_port_critical_exit(token);
+            rts_kernel_lock_exit(token);
             return RTS_STATUS_CAPACITY_EXHAUSTED;
         }
         rts_mutex_owner_link(mutex, current);
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_OK;
     }
     if (mutex->owner == current)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
     if (timeout == 0u)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_TIMEOUT;
     }
     if (rts_scheduler_task_is_timer_service(current))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_CONTEXT;
     }
     if (current->owned_mutex_count >= (size_t)RTS_MAX_MUTEXES_PER_TASK)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_CAPACITY_EXHAUSTED;
     }
     if (rts_mutex_would_cycle(current, mutex))
     {
         RTS_ASSERT(!rts_mutex_would_cycle(current, mutex));
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
     if (!rts_mutex_current_can_block(kernel))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
 
@@ -269,10 +275,10 @@ rts_status_t rts_mutex_lock(rts_mutex_t *mutex, rts_tick_t timeout)
     RTS_FATAL_UNLESS(selected != NULL && selected != current);
     notify_port = selected != NULL && selected != current &&
                   rts_scheduler_prepare_switch(selected);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     if (current->wait.result != RTS_WAIT_RESULT_NONE)
     {
@@ -300,7 +306,7 @@ static rts_tcb_t *rts_mutex_handoff(rts_kernel_state_t *kernel,
     waiter->wait.object = NULL;
     waiter->wait.timeout_active = false;
     waiter->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
-    waiter->state = waiter == kernel->current_task
+    waiter->state = waiter == rts_scheduler_current_get()
                         ? RTS_TASK_STATE_RUNNING
                         : RTS_TASK_STATE_READY;
     RTS_FATAL_UNLESS(rts_policy_task_unblock(waiter));
@@ -314,7 +320,7 @@ static rts_tcb_t *rts_mutex_handoff(rts_kernel_state_t *kernel,
 rts_status_t rts_mutex_unlock(rts_mutex_t *mutex)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     rts_tcb_t *former_owner;
     bool notify_port;
 
@@ -330,15 +336,15 @@ rts_status_t rts_mutex_unlock(rts_mutex_t *mutex)
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (!rts_mutex_is_valid(mutex))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_ARGUMENT;
     }
-    if (mutex->owner != kernel->current_task)
+    if (mutex->owner != rts_scheduler_current_get())
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
     former_owner = mutex->owner;
@@ -356,10 +362,10 @@ rts_status_t rts_mutex_unlock(rts_mutex_t *mutex)
         RTS_FATAL_UNLESS(rts_priority_recompute_chain(mutex->owner));
     }
     notify_port = rts_mutex_plan_final(kernel);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     return RTS_STATUS_OK;
 }
@@ -378,7 +384,7 @@ bool rts_mutex_timeout_task(rts_kernel_state_t *kernel, rts_tcb_t *task)
     }
     mutex = task->wait.object;
     owner = mutex->owner;
-    still_executing = task == kernel->current_task;
+    still_executing = task == rts_scheduler_current_get();
     rts_wait_object_remove(&mutex->waiters, task);
     rts_delay_remove(&kernel->delay_queue, task);
     task->wait.reason = RTS_WAIT_NONE;

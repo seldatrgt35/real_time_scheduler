@@ -13,7 +13,7 @@ static bool rts_cm4f_start_task_is_valid(const rts_kernel_state_t *kernel,
                                          const rts_tcb_t *task)
 {
     return kernel->lifecycle == RTS_KERNEL_RUNNING && task != NULL &&
-           task == kernel->current_task &&
+           task == rts_scheduler_current_get() &&
            task->state == RTS_TASK_STATE_RUNNING &&
            task->saved_stack_pointer != NULL &&
            ((uintptr_t)task->saved_stack_pointer %
@@ -55,7 +55,7 @@ void *rts_cm4f_start_handoff_consume(void)
 rts_status_t rts_cm4f_start_handoff_prepare(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_tcb_t *task = kernel->current_task;
+    rts_tcb_t *task = rts_scheduler_current_get();
 
     if (rts_cm4f_start_attempted ||
         !rts_cm4f_start_task_is_valid(kernel, task))
@@ -87,5 +87,5 @@ rts_status_t rts_port_start_first_task(void)
 _Noreturn void rts_cm4f_start_fatal(void)
 {
     RTS_KERNEL_FATAL(RTS_FATAL_CONTEXT_CORRUPTION,
-                     rts_kernel_state_get()->current_task);
+                     rts_scheduler_current_get());
 }

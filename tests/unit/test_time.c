@@ -67,6 +67,11 @@ rts_kernel_state_t *rts_kernel_state_get(void)
     return &test_kernel;
 }
 
+rts_tcb_t *rts_scheduler_current_get(void)
+{
+    return test_kernel.current_task;
+}
+
 bool rts_port_is_in_isr(void)
 {
     return test_in_isr;
@@ -179,8 +184,9 @@ bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
     return false;
 }
 
-void rts_port_request_context_switch(void)
+void rts_port_request_reschedule(rts_cpu_id_t cpu)
 {
+    CHECK(rts_cpu_id_is_valid(cpu));
     ++switch_request_count;
 }
 

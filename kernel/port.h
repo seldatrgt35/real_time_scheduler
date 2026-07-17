@@ -7,6 +7,7 @@
 
 #include "rts/rts_types.h"
 #include "rts/rts_power.h"
+#include "cpu.h"
 
 typedef uintptr_t rts_critical_token_t;
 
@@ -44,7 +45,7 @@ void rts_port_critical_exit(rts_critical_token_t token);
 bool rts_port_is_in_isr(void);
 uint32_t rts_port_exception_number(void);
 void rts_port_fatal_disable(void);
-void rts_port_request_context_switch(void);
+void rts_port_request_reschedule(rts_cpu_id_t cpu);
 rts_status_t rts_port_tick_start(void);
 bool rts_port_tick_commit_start(void);
 void rts_port_tick_stop(void);

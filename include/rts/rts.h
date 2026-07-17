@@ -2,6 +2,7 @@
 #define RTS_H
 
 #include "rts/rts_types.h"
+#include "rts/rts_version.h"
 #include "rts/rts_task.h"
 #include "rts/rts_semaphore.h"
 #include "rts/rts_mutex.h"

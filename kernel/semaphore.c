@@ -4,6 +4,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "semaphore_internal.h"
 #include "time_internal.h"
 #include "wait_object_internal.h"
@@ -49,7 +50,7 @@ rts_status_t rts_semaphore_init(rts_semaphore_t *semaphore,
 
 static bool rts_semaphore_current_can_block(const rts_kernel_state_t *kernel)
 {
-    const rts_tcb_t *current = kernel->current_task;
+    const rts_tcb_t *current = rts_scheduler_current_get();
 
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            !rts_scheduler_task_is_idle(current) &&
@@ -66,7 +67,7 @@ static void rts_semaphore_make_ready(rts_kernel_state_t *kernel,
                                      rts_tcb_t *task,
                                      rts_wait_result_t result)
 {
-    bool still_executing = task == kernel->current_task;
+    bool still_executing = task == rts_scheduler_current_get();
 
     RTS_FATAL_UNLESS(task->state == RTS_TASK_STATE_BLOCKED);
     RTS_FATAL_UNLESS(task->wait.reason == RTS_WAIT_SEMAPHORE);
@@ -118,8 +119,9 @@ static bool rts_semaphore_wake_one(rts_kernel_state_t *kernel,
 
 static bool rts_semaphore_plan_after_wake(rts_kernel_state_t *kernel)
 {
+    (void)kernel;
     rts_tcb_t *selected = rts_scheduler_select_highest_ready();
-    rts_tcb_t *current = kernel->current_task;
+    rts_tcb_t *current = rts_scheduler_current_get();
 
     RTS_FATAL_UNLESS(selected != NULL);
     RTS_FATAL_UNLESS(current != NULL);
@@ -143,7 +145,7 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
                                 rts_tick_t timeout)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     rts_tcb_t *current;
     rts_tcb_t *selected;
     bool notify_port;
@@ -162,10 +164,10 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
         return RTS_STATUS_INVALID_STATE;
     }
 
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (!rts_semaphore_is_valid(semaphore))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_ARGUMENT;
     }
     if (semaphore->count > 0u)
@@ -177,27 +179,27 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
 #endif
         RTS_TRACE(RTS_TRACE_SEMAPHORE,
                   RTS_WAIT_RESULT_ACQUIRED, semaphore->count);
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_OK;
     }
     if (timeout == 0u)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_TIMEOUT;
     }
-    if (rts_scheduler_task_is_timer_service(kernel->current_task))
+    if (rts_scheduler_task_is_timer_service(rts_scheduler_current_get()))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_CONTEXT;
     }
     if (kernel->lifecycle != RTS_KERNEL_RUNNING ||
         !rts_semaphore_current_can_block(kernel))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
 
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     RTS_FATAL_UNLESS(rts_policy_task_block(current));
     current->wait.reason = RTS_WAIT_SEMAPHORE;
     current->wait.result = RTS_WAIT_RESULT_NONE;
@@ -223,10 +225,10 @@ rts_status_t rts_semaphore_take(rts_semaphore_t *semaphore,
     RTS_FATAL_UNLESS(selected != NULL && selected != current);
     notify_port = selected != NULL && selected != current &&
                   rts_scheduler_prepare_switch(selected);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
 
     if (current->wait.result != RTS_WAIT_RESULT_NONE)
@@ -242,7 +244,7 @@ static rts_status_t rts_semaphore_give_common(rts_semaphore_t *semaphore,
                                               bool *notify_port)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     bool woke;
 
     *notify_port = false;
@@ -250,10 +252,10 @@ static rts_status_t rts_semaphore_give_common(rts_semaphore_t *semaphore,
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (!rts_semaphore_is_valid(semaphore))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_ARGUMENT;
     }
     woke = rts_semaphore_wake_one(kernel, semaphore);
@@ -261,7 +263,7 @@ static rts_status_t rts_semaphore_give_common(rts_semaphore_t *semaphore,
     {
         if (semaphore->count == semaphore->maximum_count)
         {
-            rts_port_critical_exit(token);
+            rts_kernel_lock_exit(token);
             return RTS_STATUS_FULL;
         }
         ++semaphore->count;
@@ -270,7 +272,7 @@ static rts_status_t rts_semaphore_give_common(rts_semaphore_t *semaphore,
     {
         *notify_port = rts_semaphore_plan_after_wake(kernel);
     }
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     (void)from_isr;
     return RTS_STATUS_OK;
 }
@@ -291,7 +293,7 @@ rts_status_t rts_semaphore_give(rts_semaphore_t *semaphore)
     status = rts_semaphore_give_common(semaphore, false, &notify_port);
     if (status == RTS_STATUS_OK && notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     return status;
 }

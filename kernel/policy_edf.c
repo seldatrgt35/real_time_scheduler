@@ -134,7 +134,7 @@ bool rts_policy_edf_tick(rts_tick_t elapsed_ticks)
 {
 #if RTS_ENABLE_TIME_SLICING
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_tcb_t *current = kernel->current_task;
+    rts_tcb_t *current = rts_scheduler_current_get();
 
     if (current == NULL || current->state != RTS_TASK_STATE_RUNNING ||
         current == kernel->idle_task || kernel->switch_plan.active ||

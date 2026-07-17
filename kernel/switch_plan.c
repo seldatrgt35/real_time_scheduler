@@ -23,7 +23,8 @@ static void rts_switch_plan_clear(rts_switch_plan_t *plan)
 static bool rts_switch_outgoing_is_valid(const rts_kernel_state_t *kernel,
                                          const rts_tcb_t *task)
 {
-    return task != NULL && task == kernel->current_task &&
+    (void)kernel;
+    return task != NULL && task == rts_scheduler_current_get() &&
            ((task->state == RTS_TASK_STATE_RUNNING &&
              rts_scheduler_task_is_runnable(task)) ||
             (task->state == RTS_TASK_STATE_BLOCKED &&
@@ -34,16 +35,17 @@ static bool rts_switch_outgoing_is_valid(const rts_kernel_state_t *kernel,
 bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_switch_plan_t *plan = &kernel->switch_plan;
+    rts_switch_plan_t *plan =
+        rts_scheduler_switch_plan_on_cpu(rts_cpu_current_id());
 
     RTS_ASSERT(kernel->lifecycle == RTS_KERNEL_RUNNING);
-    RTS_ASSERT(kernel->current_task != NULL);
-    RTS_ASSERT(rts_switch_outgoing_is_valid(kernel, kernel->current_task));
+    RTS_ASSERT(rts_scheduler_current_get() != NULL);
+    RTS_ASSERT(rts_switch_outgoing_is_valid(kernel, rts_scheduler_current_get()));
     RTS_ASSERT(next_task != NULL);
     RTS_ASSERT(next_task == NULL || rts_scheduler_task_is_runnable(next_task));
     if (kernel->lifecycle != RTS_KERNEL_RUNNING ||
-        kernel->current_task == NULL ||
-        !rts_switch_outgoing_is_valid(kernel, kernel->current_task) ||
+        rts_scheduler_current_get() == NULL ||
+        !rts_switch_outgoing_is_valid(kernel, rts_scheduler_current_get()) ||
         next_task == NULL || !rts_scheduler_task_is_runnable(next_task))
     {
         return false;
@@ -56,11 +58,11 @@ bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
     }
 
     plan->reselection_required = false;
-    if (next_task == kernel->current_task)
+    if (next_task == rts_scheduler_current_get())
     {
         if (plan->pending)
         {
-            RTS_ASSERT(plan->from == kernel->current_task);
+            RTS_ASSERT(plan->from == rts_scheduler_current_get());
             plan->generation = rts_switch_next_generation(plan->generation);
             rts_switch_plan_clear(plan);
         }
@@ -75,7 +77,7 @@ bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
 
     if (!plan->pending)
     {
-        plan->from = kernel->current_task;
+        plan->from = rts_scheduler_current_get();
         plan->to = next_task;
         plan->pending = true;
         plan->generation = rts_switch_next_generation(plan->generation);
@@ -85,9 +87,9 @@ bool rts_scheduler_prepare_switch(rts_tcb_t *next_task)
         return true;
     }
 
-    RTS_ASSERT(plan->from == kernel->current_task);
+    RTS_ASSERT(plan->from == rts_scheduler_current_get());
     RTS_ASSERT(plan->to != NULL);
-    if (plan->from != kernel->current_task || plan->to == NULL)
+    if (plan->from != rts_scheduler_current_get() || plan->to == NULL)
     {
         return false;
     }
@@ -104,14 +106,15 @@ void rts_scheduler_request_switch_if_needed(rts_tcb_t *next_task)
 {
     if (rts_scheduler_prepare_switch(next_task))
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
 }
 
 bool rts_scheduler_switch_acquire(rts_switch_snapshot_t *snapshot)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_switch_plan_t *plan = &kernel->switch_plan;
+    rts_switch_plan_t *plan =
+        rts_scheduler_switch_plan_on_cpu(rts_cpu_current_id());
 
     RTS_ASSERT(snapshot != NULL);
     RTS_ASSERT(kernel->lifecycle == RTS_KERNEL_RUNNING);
@@ -126,14 +129,14 @@ bool rts_scheduler_switch_acquire(rts_switch_snapshot_t *snapshot)
         return false;
     }
 
-    RTS_ASSERT(plan->from == kernel->current_task);
+    RTS_ASSERT(plan->from == rts_scheduler_current_get());
     RTS_ASSERT(plan->from != NULL && plan->to != NULL);
     RTS_ASSERT(plan->from != plan->to);
     RTS_ASSERT(plan->from == NULL ||
                rts_switch_outgoing_is_valid(kernel, plan->from));
     RTS_ASSERT(plan->to == NULL || plan->to->state == RTS_TASK_STATE_READY);
     RTS_ASSERT(plan->to == NULL || rts_scheduler_task_is_runnable(plan->to));
-    if (plan->from != kernel->current_task || plan->from == NULL ||
+    if (plan->from != rts_scheduler_current_get() || plan->from == NULL ||
         plan->to == NULL || plan->from == plan->to ||
         !rts_switch_outgoing_is_valid(kernel, plan->from) ||
         plan->to->state != RTS_TASK_STATE_READY ||
@@ -153,7 +156,8 @@ bool rts_scheduler_switch_acquire(rts_switch_snapshot_t *snapshot)
 void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_switch_plan_t *plan = &kernel->switch_plan;
+    rts_switch_plan_t *plan =
+        rts_scheduler_switch_plan_on_cpu(rts_cpu_current_id());
     bool valid;
 
     RTS_ASSERT(snapshot != NULL);
@@ -170,7 +174,7 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
             snapshot->generation == plan->generation &&
             snapshot->from == plan->from && snapshot->to == plan->to &&
             snapshot->from != snapshot->to &&
-            kernel->current_task == snapshot->from &&
+            rts_scheduler_current_get() == snapshot->from &&
             rts_switch_outgoing_is_valid(kernel, snapshot->from) &&
             snapshot->to->state == RTS_TASK_STATE_READY &&
             rts_scheduler_task_is_runnable(snapshot->to);
@@ -191,7 +195,7 @@ void rts_scheduler_switch_complete(const rts_switch_snapshot_t *snapshot)
     }
     snapshot->to->slice_remaining = (rts_tick_t)RTS_TIME_SLICE_TICKS;
     snapshot->to->state = RTS_TASK_STATE_RUNNING;
-    kernel->current_task = snapshot->to;
+    rts_scheduler_set_current_on_cpu(rts_cpu_current_id(), snapshot->to);
     rts_runtime_task_started(snapshot->to, kernel->current_tick);
 #if RTS_ENABLE_RUNTIME_STATS
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.context_switches);
@@ -218,7 +222,7 @@ bool rts_scheduler_reselect_after_switch(void)
         return false;
     }
 
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     RTS_FATAL_UNLESS(current != NULL);
     RTS_FATAL_UNLESS(current == NULL || current->state == RTS_TASK_STATE_RUNNING);
     selected = rts_scheduler_select_highest_ready();

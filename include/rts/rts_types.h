@@ -10,6 +10,14 @@
 #error "RTS_MAX_TASKS must be defined by the selected rts_config.h"
 #endif
 
+#if !defined(RTS_CPU_COUNT)
+#error "RTS_CPU_COUNT must be defined by the selected rts_config.h"
+#endif
+
+#if (RTS_CPU_COUNT != 1)
+#error "Real-Time Scheduler v1.0 supports exactly one CPU"
+#endif
+
 #if !defined(RTS_PRIORITY_COUNT)
 #error "RTS_PRIORITY_COUNT must be defined by the selected rts_config.h"
 #endif

@@ -4,6 +4,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "diagnostics_internal.h"
 #include "trace_internal.h"
@@ -13,7 +14,7 @@
 static bool rts_start_preflight_is_coherent(const rts_kernel_state_t *kernel)
 {
     return kernel->lifecycle == RTS_KERNEL_INITIALIZED &&
-           kernel->current_task == NULL && kernel->idle_task != NULL &&
+           rts_scheduler_current_get() == NULL && kernel->idle_task != NULL &&
            kernel->idle_task == &kernel->idle_task_storage &&
            kernel->idle_task->state == RTS_TASK_STATE_READY &&
            rts_policy_validate(kernel->idle_task, true) &&
@@ -33,14 +34,14 @@ static void rts_start_rollback(rts_kernel_state_t *kernel)
 {
     kernel->lifecycle = RTS_KERNEL_INITIALIZED;
     RTS_FATAL_UNLESS(rts_scheduler_current_release_initial());
-    RTS_FATAL_UNLESS(kernel->current_task == NULL);
+    RTS_FATAL_UNLESS(rts_scheduler_current_get() == NULL);
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
 }
 
 rts_status_t rts_start(void)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t critical_token;
+    rts_kernel_lock_token_t critical_token;
     rts_tcb_t *selected;
     rts_status_t port_status;
     bool coherent;
@@ -64,13 +65,13 @@ rts_status_t rts_start(void)
         return RTS_STATUS_INVALID_STATE;
     }
 
-    critical_token = rts_port_critical_enter();
+    critical_token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_INITIALIZED)
     {
         rts_status_t status = kernel->lifecycle == RTS_KERNEL_RUNNING
                                   ? RTS_STATUS_ALREADY_STARTED
                                   : RTS_STATUS_INVALID_STATE;
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return status;
     }
 
@@ -78,7 +79,7 @@ rts_status_t rts_start(void)
     RTS_ASSERT(coherent);
     if (!coherent)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
@@ -91,17 +92,17 @@ rts_status_t rts_start(void)
         !rts_scheduler_task_is_runnable(selected) ||
         !rts_scheduler_current_establish(selected))
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
     kernel->lifecycle = RTS_KERNEL_RUNNING;
-    rts_runtime_task_started(kernel->current_task, kernel->current_tick);
+    rts_runtime_task_started(rts_scheduler_current_get(), kernel->current_tick);
 #if RTS_ENABLE_RUNTIME_STATS
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.scheduler_starts);
 #endif
     RTS_TRACE(RTS_TRACE_SCHEDULER_STARTED,
-              kernel->current_task->priority, 0u);
+              rts_scheduler_current_get()->priority, 0u);
     RTS_FATAL_UNLESS(rts_scheduler_current_is_valid());
 
     port_status = rts_port_tick_start();
@@ -109,7 +110,7 @@ rts_status_t rts_start(void)
     {
         rts_port_tick_stop();
         rts_start_rollback(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
@@ -118,11 +119,11 @@ rts_status_t rts_start(void)
     {
         rts_port_tick_stop();
         rts_start_rollback(kernel);
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_PORT_ERROR;
     }
 
     /* Only the deterministic host port returns after simulated transfer. */
-    rts_port_critical_exit(critical_token);
+    rts_kernel_lock_exit(critical_token);
     return RTS_STATUS_OK;
 }

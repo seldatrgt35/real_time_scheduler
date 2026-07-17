@@ -5,6 +5,7 @@
 #include "assert_internal.h"
 #include "diagnostics_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "time_internal.h"
 #include "timer_internal.h"
@@ -48,8 +49,8 @@ bool rts_power_sleep_is_allowed(void)
     const rts_kernel_state_t *kernel = rts_kernel_state_get();
 
     return kernel->lifecycle == RTS_KERNEL_RUNNING &&
-           !rts_port_is_in_isr() && kernel->current_task != NULL &&
-           kernel->current_task == kernel->idle_task &&
+           !rts_port_is_in_isr() && rts_scheduler_current_get() != NULL &&
+           rts_scheduler_current_get() == kernel->idle_task &&
            kernel->idle_task->state == RTS_TASK_STATE_RUNNING &&
            !kernel->switch_plan.pending && !kernel->switch_plan.active &&
            rts_policy_pick_next() == kernel->idle_task;
@@ -112,6 +113,7 @@ bool rts_power_plan_compute(rts_power_plan_t *out_plan)
     return out_plan->sleep_ticks != 0u;
 }
 
+#if RTS_ENABLE_TICKLESS_IDLE
 static void rts_power_record_wake(rts_kernel_state_t *kernel,
                                   const rts_port_sleep_result_t *result)
 {
@@ -139,6 +141,7 @@ static void rts_power_record_wake(rts_kernel_state_t *kernel,
     (void)result;
 #endif
 }
+#endif
 
 void rts_power_idle(void)
 {
@@ -146,7 +149,7 @@ void rts_power_idle(void)
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_port_sleep_result_t result;
     rts_power_plan_t plan;
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     bool request_switch = false;
     bool valid_result;
 
@@ -155,13 +158,13 @@ void rts_power_idle(void)
         return;
     }
 
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
 #if RTS_ENABLE_RUNTIME_STATS
     RTS_DIAG_COUNTER_INC(kernel->runtime_counters.tickless_sleep_attempts);
 #endif
     if (!rts_power_plan_compute(&plan))
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return;
     }
 
@@ -183,7 +186,7 @@ void rts_power_idle(void)
 #endif
         RTS_TRACE(RTS_TRACE_SLEEP_ABORT, result.status,
                   result.elapsed_ticks);
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return;
     }
 
@@ -199,11 +202,11 @@ void rts_power_idle(void)
     rts_power_after_sleep(result.elapsed_ticks, result.wake_source);
     RTS_TRACE(RTS_TRACE_SLEEP_EXIT, result.elapsed_ticks,
               result.wake_source);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
 
     if (request_switch)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
 #endif
 }

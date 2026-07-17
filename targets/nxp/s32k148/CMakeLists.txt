@@ -25,6 +25,7 @@ set(RTS_S32K148_KERNEL_SOURCES
     ${PROJECT_SOURCE_DIR}/kernel/task_handle.c
     ${PROJECT_SOURCE_DIR}/kernel/task_create.c
     ${PROJECT_SOURCE_DIR}/kernel/kernel_state.c
+    ${PROJECT_SOURCE_DIR}/kernel/cpu_local.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_init.c
     ${PROJECT_SOURCE_DIR}/kernel/scheduler_select.c
     ${PROJECT_SOURCE_DIR}/kernel/switch_plan.c

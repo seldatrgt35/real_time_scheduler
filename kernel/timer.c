@@ -6,6 +6,7 @@
 #include "assert_internal.h"
 #include "diagnostics_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "time_internal.h"
 #include "timer_internal.h"
@@ -128,7 +129,7 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_timer_manager_t *manager = &rts_timer_manager;
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     struct rts_timer *timer;
 
     if (out_handle != NULL)
@@ -149,16 +150,16 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
         return RTS_STATUS_INVALID_STATE;
     }
 
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_INITIALIZED)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
     timer = rts_timer_reserve(manager);
     if (timer == NULL)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_CAPACITY_EXHAUSTED;
     }
     timer->period = config->period;
@@ -183,7 +184,7 @@ rts_status_t rts_timer_init(const rts_timer_config_t *config,
 #endif
     RTS_TRACE(RTS_TRACE_TIMER_INITIALIZED, timer->slot_index, timer->mode);
     RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return RTS_STATUS_OK;
 }
 
@@ -221,7 +222,7 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_timer_manager_t *manager = &rts_timer_manager;
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     struct rts_timer *timer;
 
     if (rts_port_is_in_isr())
@@ -232,11 +233,11 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     timer = rts_timer_resolve(handle);
     if (!rts_timer_lifecycle_allows_control(kernel) || timer == NULL)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return timer == NULL ? RTS_STATUS_INVALID_ARGUMENT
                              : RTS_STATUS_INVALID_STATE;
     }
@@ -245,7 +246,7 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
         if (timer->state != RTS_TIMER_STOPPED ||
             timer->callback_state != RTS_TIMER_CALLBACK_IDLE)
         {
-            rts_port_critical_exit(token);
+            rts_kernel_lock_exit(token);
             return RTS_STATUS_INVALID_STATE;
         }
     }
@@ -277,7 +278,7 @@ static rts_status_t rts_timer_arm(rts_timer_handle_t handle, bool restart)
     RTS_TRACE(restart ? RTS_TRACE_TIMER_RESTARTED : RTS_TRACE_TIMER_STARTED,
               timer->slot_index, timer->expiration_tick);
     RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return RTS_STATUS_OK;
 }
 
@@ -295,7 +296,7 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
     rts_timer_manager_t *manager = &rts_timer_manager;
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     struct rts_timer *timer;
     bool had_effect;
 
@@ -307,11 +308,11 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     timer = rts_timer_resolve(handle);
     if (!rts_timer_lifecycle_allows_control(kernel) || timer == NULL)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return timer == NULL ? RTS_STATUS_INVALID_ARGUMENT
                              : RTS_STATUS_INVALID_STATE;
     }
@@ -319,7 +320,7 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
                  timer->callback_state != RTS_TIMER_CALLBACK_IDLE;
     if (!had_effect)
     {
-        rts_port_critical_exit(token);
+        rts_kernel_lock_exit(token);
         return RTS_STATUS_INVALID_STATE;
     }
     if (timer->state == RTS_TIMER_ACTIVE)
@@ -335,13 +336,13 @@ rts_status_t rts_timer_stop(rts_timer_handle_t handle)
 #endif
     RTS_TRACE(RTS_TRACE_TIMER_STOPPED, timer->slot_index, timer->generation);
     RTS_FATAL_UNLESS(rts_timer_manager_validate(manager));
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return RTS_STATUS_OK;
 }
 
 bool rts_timer_is_running(rts_timer_handle_t handle)
 {
-    rts_critical_token_t token;
+    rts_kernel_lock_token_t token;
     struct rts_timer *timer;
     bool active;
 
@@ -349,12 +350,12 @@ bool rts_timer_is_running(rts_timer_handle_t handle)
     {
         return false;
     }
-    token = rts_port_critical_enter();
+    token = rts_kernel_lock_enter();
     timer = rts_timer_resolve(handle);
     active = timer != NULL && timer->state == RTS_TIMER_ACTIVE &&
              rts_timer_queue_contains(&rts_timer_manager.active_queue,
                                       timer);
-    rts_port_critical_exit(token);
+    rts_kernel_lock_exit(token);
     return active;
 }
 

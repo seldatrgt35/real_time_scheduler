@@ -32,6 +32,8 @@ bool rts_priority_set_effective(rts_tcb_t *task,
     rts_wait_object_storage_t *waiters;
     rts_priority_t previous;
 
+    (void)kernel;
+
     if (task == NULL || effective_priority < task->base_priority ||
         effective_priority == RTS_IDLE_PRIORITY ||
         (size_t)effective_priority >= (size_t)RTS_PRIORITY_COUNT)

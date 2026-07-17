@@ -1,13 +1,46 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(real_time_scheduler LANGUAGES C)
+project(real_time_scheduler VERSION 1.0.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+add_library(rts_public_api INTERFACE)
+target_include_directories(rts_public_api INTERFACE
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(rts_release_audit
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/release_audit.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        VERBATIM)
+endif()
+
+find_package(Doxygen QUIET)
+if(DOXYGEN_FOUND)
+    add_custom_target(rts_docs
+        COMMAND ${DOXYGEN_EXECUTABLE} ${PROJECT_SOURCE_DIR}/Doxyfile
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        VERBATIM)
+endif()
+
 option(RTS_BUILD_HOST_TESTS "Build deterministic host-port tests" ON)
 if(RTS_BUILD_HOST_TESTS)
+    option(RTS_HOST_FREESTANDING_TEST_RUNTIME
+        "Link host tests without a platform C runtime" OFF)
+    if(RTS_HOST_FREESTANDING_TEST_RUNTIME)
+        add_library(rts_test_freestanding_runtime STATIC
+            ${PROJECT_SOURCE_DIR}/tests/support/freestanding_memory.c)
+        target_compile_options(rts_test_freestanding_runtime PRIVATE
+            -ffreestanding -fno-builtin -fno-autolink
+            -mno-stack-arg-probe)
+        add_compile_options(-ffreestanding -fno-builtin -fno-autolink
+                            -mno-stack-arg-probe)
+        add_link_options(-nostdlib "-Wl,/entry:main,/subsystem:console")
+        link_libraries(rts_test_freestanding_runtime)
+    endif()
     enable_testing()
     add_subdirectory(tests)
 endif()

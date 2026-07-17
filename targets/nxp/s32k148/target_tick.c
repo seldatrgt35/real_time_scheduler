@@ -149,6 +149,6 @@ void SysTick_Handler(void)
     notify_port = rts_s32k148_tick_isr_hook() || notify_port;
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
 }

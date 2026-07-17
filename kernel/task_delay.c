@@ -4,6 +4,7 @@
 
 #include "assert_internal.h"
 #include "port.h"
+#include "kernel_lock.h"
 #include "scheduler_internal.h"
 #include "time_internal.h"
 #include "diagnostics_internal.h"
@@ -12,7 +13,7 @@
 
 static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
 {
-    const rts_tcb_t *current = kernel->current_task;
+    const rts_tcb_t *current = rts_scheduler_current_get();
 
     return current != NULL && current->state == RTS_TASK_STATE_RUNNING &&
            !rts_scheduler_task_is_idle(current) &&
@@ -29,7 +30,7 @@ static bool rts_delay_current_is_coherent(const rts_kernel_state_t *kernel)
 rts_status_t rts_task_delay(rts_tick_t delay)
 {
     rts_kernel_state_t *kernel = rts_kernel_state_get();
-    rts_critical_token_t critical_token;
+    rts_kernel_lock_token_t critical_token;
     rts_tcb_t *current;
     rts_tcb_t *selected;
     bool coherent;
@@ -51,15 +52,15 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     {
         return RTS_STATUS_INVALID_STATE;
     }
-    if (rts_scheduler_task_is_timer_service(kernel->current_task))
+    if (rts_scheduler_task_is_timer_service(rts_scheduler_current_get()))
     {
         return RTS_STATUS_INVALID_CONTEXT;
     }
 
-    critical_token = rts_port_critical_enter();
+    critical_token = rts_kernel_lock_enter();
     if (kernel->lifecycle != RTS_KERNEL_RUNNING)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
@@ -67,11 +68,11 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     RTS_ASSERT(coherent);
     if (!coherent)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
-    current = kernel->current_task;
+    current = rts_scheduler_current_get();
     current->wait.wake_tick = kernel->current_tick + delay;
     RTS_FATAL_UNLESS(rts_policy_task_block(current));
     RTS_FATAL_UNLESS(rts_policy_validate(current, false));
@@ -95,17 +96,17 @@ rts_status_t rts_task_delay(rts_tick_t delay)
     RTS_FATAL_UNLESS(selected == NULL || selected != current);
     if (selected == NULL || selected == current)
     {
-        rts_port_critical_exit(critical_token);
+        rts_kernel_lock_exit(critical_token);
         return RTS_STATUS_INVALID_STATE;
     }
 
     notify_port = rts_scheduler_prepare_switch(selected);
     RTS_FATAL_UNLESS(kernel->switch_plan.pending || kernel->switch_plan.active);
-    rts_port_critical_exit(critical_token);
+    rts_kernel_lock_exit(critical_token);
 
     if (notify_port)
     {
-        rts_port_request_context_switch();
+        rts_port_request_reschedule(rts_cpu_current_id());
     }
     return RTS_STATUS_OK;
 }
