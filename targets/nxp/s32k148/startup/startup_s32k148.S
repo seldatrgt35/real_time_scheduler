@@ -64,7 +64,13 @@ Reset_Handler:
     str     r1, [r0]
     ldr     r1, [r0]                  /* complete the unlock write */
     ldr     r0, =0x40052000          /* WDOG->CS */
-    ldr     r1, =0x00002124          /* CMD32EN | LPO | DBG | UPDATE */
+    /* Use the SDK reset configuration exactly: CMD32EN, LPO clock,
+     * watchdog disabled, and UPDATE enabled.  Do not set DBG here; the
+     * reset value is the documented configuration used by SystemInit(). */
+    ldr     r1, =0x00002520          /* CMD32EN | LPO | UPDATE, EN=0 */
+    str     r1, [r0]
+    ldr     r0, =0x40052008          /* WDOG->TOVAL */
+    ldr     r1, =0x0000ffff
     str     r1, [r0]
 
     /* S32K148 SRAM ECC requires initialization with aligned word writes. */
