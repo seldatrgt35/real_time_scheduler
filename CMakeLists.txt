@@ -64,6 +64,10 @@ if(RTS_BUILD_S32K148_SMOKE)
     set(RTS_CONFIG_INCLUDE_DIR
         "${PROJECT_SOURCE_DIR}/targets/nxp/s32k148/${_rts_s32k148_config}" CACHE PATH
         "Directory containing the selected rts_config.h" FORCE)
+    set(RTS_S32K148_DEVICE_INCLUDE_DIR "" CACHE PATH
+        "Directory containing NXP S32K148.h")
+    set(RTS_S32K148_CMSIS_INCLUDE_DIR "" CACHE PATH
+        "Directory containing CMSIS core_cm4.h")
     set(RTS_CORTEX_M_NVIC_PRIORITY_BITS 4 CACHE STRING
         "Implemented S32K148 NVIC priority bits" FORCE)
     set(RTS_CORTEX_M_PENDSV_PRIORITY 15 CACHE STRING

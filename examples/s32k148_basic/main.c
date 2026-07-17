@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "S32K148.h"
+#include "target_device.h"
 #include "rts/rts.h"
 #include "rts/rts_task.h"
 #include "rts/rts_semaphore.h"

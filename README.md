@@ -253,6 +253,15 @@ cmake --build build-cortex-m4f
 
 The priority values above are an example and must match the final MCU integration and approved interrupt-priority policy. An SDK-dependent cooperative S32K148 smoke image is available with `RTS_BUILD_S32K148_SMOKE=ON`; provide NXP's `S32K148.h` directory through `RTS_S32K148_DEVICE_INCLUDE_DIR`.
 
+For the NXP S32K148EVB-Q176 with S32 Design Studio on Windows, use the
+[board quick-start guide](docs/guides/s32k148-evb-q176-quick-start.md). A helper
+script builds a flashable ELF, Intel HEX, and Motorola S-record with the S32DS
+ARM GCC toolchain:
+
+```powershell
+.\tools\build_s32k148.ps1 -BuildType Debug -Policy FP -Clean
+```
+
 ## Repository layout
 
 ```text

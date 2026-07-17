@@ -4,11 +4,19 @@ if(NOT CMAKE_CROSSCOMPILING)
 endif()
 if(NOT DEFINED RTS_S32K148_DEVICE_INCLUDE_DIR)
     message(FATAL_ERROR
-        "RTS_S32K148_DEVICE_INCLUDE_DIR must contain NXP S32K148.h and CMSIS core headers")
+        "RTS_S32K148_DEVICE_INCLUDE_DIR must contain NXP S32K148.h")
 endif()
 if(NOT EXISTS "${RTS_S32K148_DEVICE_INCLUDE_DIR}/S32K148.h")
     message(FATAL_ERROR
         "${RTS_S32K148_DEVICE_INCLUDE_DIR}/S32K148.h was not found")
+endif()
+if(NOT DEFINED RTS_S32K148_CMSIS_INCLUDE_DIR)
+    message(FATAL_ERROR
+        "RTS_S32K148_CMSIS_INCLUDE_DIR must contain CMSIS core_cm4.h")
+endif()
+if(NOT EXISTS "${RTS_S32K148_CMSIS_INCLUDE_DIR}/core_cm4.h")
+    message(FATAL_ERROR
+        "${RTS_S32K148_CMSIS_INCLUDE_DIR}/core_cm4.h was not found")
 endif()
 
 set(RTS_S32K148_LINKER_SCRIPT
@@ -65,6 +73,7 @@ add_library(rts_target_s32k148 STATIC
 )
 target_include_directories(rts_target_s32k148 PRIVATE
     ${RTS_S32K148_DEVICE_INCLUDE_DIR}
+    ${RTS_S32K148_CMSIS_INCLUDE_DIR}
     ${RTS_CONFIG_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/kernel
@@ -89,6 +98,7 @@ set_target_properties(rts_example_s32k148_basic PROPERTIES
 )
 target_include_directories(rts_example_s32k148_basic PRIVATE
     ${RTS_S32K148_DEVICE_INCLUDE_DIR}
+    ${RTS_S32K148_CMSIS_INCLUDE_DIR}
     ${RTS_CONFIG_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/kernel
@@ -132,6 +142,7 @@ target_link_options(rts_example_s32k148_basic PRIVATE
 find_program(RTS_S32K148_OBJDUMP NAMES arm-none-eabi-objdump llvm-objdump REQUIRED)
 find_program(RTS_S32K148_NM NAMES arm-none-eabi-nm llvm-nm REQUIRED)
 find_program(RTS_S32K148_SIZE NAMES arm-none-eabi-size llvm-size REQUIRED)
+find_program(RTS_S32K148_OBJCOPY NAMES arm-none-eabi-objcopy llvm-objcopy REQUIRED)
 add_custom_command(TARGET rts_example_s32k148_basic POST_BUILD
     COMMAND ${CMAKE_COMMAND}
             -DELF_FILE=$<TARGET_FILE:rts_example_s32k148_basic>
@@ -144,6 +155,12 @@ add_custom_command(TARGET rts_example_s32k148_basic POST_BUILD
             -DOUTPUT_DIR=$<TARGET_FILE_DIR:rts_example_s32k148_basic>
             -DSIZE_TOOL=${RTS_S32K148_SIZE}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/report_sizes.cmake
+    COMMAND ${RTS_S32K148_OBJCOPY} -O ihex
+            $<TARGET_FILE:rts_example_s32k148_basic>
+            $<TARGET_FILE_DIR:rts_example_s32k148_basic>/rts_s32k148_smoke.hex
+    COMMAND ${RTS_S32K148_OBJCOPY} -O srec
+            $<TARGET_FILE:rts_example_s32k148_basic>
+            $<TARGET_FILE_DIR:rts_example_s32k148_basic>/rts_s32k148_smoke.srec
     VERBATIM
 )
 

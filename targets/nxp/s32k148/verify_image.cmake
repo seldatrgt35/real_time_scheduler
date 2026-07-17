@@ -11,6 +11,7 @@ execute_process(COMMAND "${OBJDUMP_TOOL}" -h "${ELF_FILE}"
 
 file(READ "${SYMBOL_FILE}" symbols)
 file(READ "${DISASSEMBLY_FILE}" disassembly)
+string(TOLOWER "${disassembly}" disassembly_lower)
 
 foreach(required Reset_Handler SVC_Handler PendSV_Handler SysTick_Handler
                  LPTMR0_IRQHandler rts_port_power_sleep
@@ -35,16 +36,16 @@ foreach(forbidden malloc calloc realloc free printf fprintf puts rts_host_test
     endif()
 endforeach()
 
-if(disassembly MATCHES "[ \t](vldr|vstr|vmov|vadd|vsub|vmul|vdiv|vpush|vpop|vsqrt|vcvt)\\.")
+if(disassembly_lower MATCHES "[ \t](vldr|vstr|vmov|vadd|vsub|vmul|vdiv|vpush|vpop|vsqrt|vcvt)\\.")
     message(FATAL_ERROR "VFP instruction found in no-FPU target image")
 endif()
-if(NOT disassembly MATCHES "mrs[ \t]+[^\n]*psp")
+if(NOT disassembly_lower MATCHES "mrs[ \t]+[^\n]*psp")
     message(FATAL_ERROR "Final image does not contain a PSP read")
 endif()
-if(NOT disassembly MATCHES "msr[ \t]+psp")
+if(NOT disassembly_lower MATCHES "msr[ \t]+psp")
     message(FATAL_ERROR "Final image does not contain a PSP write")
 endif()
-if(NOT disassembly MATCHES "svc[ \t]+#0x?0")
+if(NOT disassembly_lower MATCHES "svc[ \t]+(#0x?0|0)")
     message(FATAL_ERROR "Final image does not contain the approved SVC #0")
 endif()
 

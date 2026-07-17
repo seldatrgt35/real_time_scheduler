@@ -1,6 +1,6 @@
 #include "target_diagnostics.h"
 
-#include "S32K148.h"
+#include "target_device.h"
 #include "rts/rts_types.h"
 
 volatile rts_s32k148_timing_record_t g_rts_s32k148_timing_record;

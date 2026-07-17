@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "S32K148.h"
+#include "target_device.h"
 #include "assert_internal.h"
 #include "fatal_internal.h"
 
