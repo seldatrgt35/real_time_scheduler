@@ -7,8 +7,7 @@
 - intended candidate tag: `v1.0.0-rc1`;
 - language baseline: strict C11;
 - supported CPU count: exactly one;
-- supported architecture/target: ARM Cortex-M4F / NXP S32K148;
-- license: MIT.
+- supported architecture/target: ARM Cortex-M4F / NXP S32K148.
 
 The final `v1.0.0` stable tag is reserved until physical target evidence closes
 the conditional acceptance item. This avoids representing an unexecuted target

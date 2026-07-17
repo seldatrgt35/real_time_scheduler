@@ -320,7 +320,5 @@ The ADRs under `docs/architecture/adr/` record key ABI, interrupt, stack-frame, 
 3. Measure target stack margins, context-switch latency, and PRIMASK windows.
 4. Complete product-specific safety, timing, and tool qualification activities.
 
-## License
-
-Released under the MIT License. See [LICENSE](LICENSE) and
+Third-party tool and SDK notices are recorded in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

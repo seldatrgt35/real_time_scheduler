@@ -53,6 +53,7 @@ static struct rts_timer *rts_timer_reserve(rts_timer_manager_t *manager)
         manager->next_free_hint >= (size_t)RTS_MAX_TIMERS)
     {
         RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, manager);
+        return NULL;
     }
     for (examined = 0u; examined < (size_t)RTS_MAX_TIMERS; ++examined)
     {

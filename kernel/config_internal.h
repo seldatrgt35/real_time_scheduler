@@ -31,7 +31,8 @@ _Static_assert((RTS_TIMER_SERVICE_STACK_SIZE_BYTES %
                "timer-service stack size must preserve alignment");
 _Static_assert(RTS_TIMER_CALLBACK_QUEUE_CAPACITY >= RTS_MAX_TIMERS,
                "callback queue must hold one item per timer");
-_Static_assert(RTS_TIME_SLICE_TICKS <= UINT32_MAX,
+_Static_assert((RTS_TIME_SLICE_TICKS) ==
+                   (rts_tick_t)(RTS_TIME_SLICE_TICKS),
                "time-slice quantum must fit in rts_tick_t");
 _Static_assert(RTS_TICKLESS_MAX_SLEEP_TICKS <= UINT32_C(0x7fffffff),
                "tickless maintenance interval must be wrap safe");

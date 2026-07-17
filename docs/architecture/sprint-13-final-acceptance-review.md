@@ -218,7 +218,7 @@ The exhaustive limitation list is maintained in
 
 - [x] semantic version and release notes;
 - [x] public API compatibility inventory;
-- [x] license and third-party notice;
+- [x] third-party dependency notice;
 - [x] user, kernel, porting, policy, testing, and target guides;
 - [x] CI/static-analysis definitions;
 - [x] deterministic policy stress;

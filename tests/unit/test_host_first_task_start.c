@@ -23,6 +23,11 @@ rts_kernel_state_t *rts_kernel_state_get(void)
     return &test_kernel;
 }
 
+rts_tcb_t *rts_scheduler_current_get(void)
+{
+    return test_kernel.current_task;
+}
+
 bool rts_scheduler_current_is_valid(void)
 {
     return test_current_valid;

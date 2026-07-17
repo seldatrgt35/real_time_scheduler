@@ -36,6 +36,7 @@ void rts_timer_queue_insert(rts_timer_queue_t *queue,
         if (queued == NULL)
         {
             RTS_KERNEL_FATAL(RTS_FATAL_TIMER_CORRUPTION, position);
+            return;
         }
         if (rts_tick_before(timer->expiration_tick,
                             queued->expiration_tick))
