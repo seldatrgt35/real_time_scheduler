@@ -55,6 +55,18 @@ g_s32k148_flash_config:
 Reset_Handler:
     cpsid   i
 
+    /* Disable the reset watchdog before the full SRAM ECC initialization.
+     * This must remain in assembly because the initial MSP points into SRAM
+     * whose ECC state has not been initialized yet. The sequence mirrors the
+     * S32K148 SDK SystemInit watchdog unlock without using the stack. */
+    ldr     r0, =0x40052004          /* WDOG->CNT */
+    ldr     r1, =0xD928C520          /* FEATURE_WDOG_UNLOCK_VALUE */
+    str     r1, [r0]
+    ldr     r1, [r0]                  /* complete the unlock write */
+    ldr     r0, =0x40052000          /* WDOG->CS */
+    ldr     r1, =0x00002124          /* CMD32EN | LPO | DBG | UPDATE */
+    str     r1, [r0]
+
     /* S32K148 SRAM ECC requires initialization with aligned word writes. */
     ldr     r0, =__ram_start
     ldr     r1, =__ram_end
