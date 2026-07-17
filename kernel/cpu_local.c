@@ -24,6 +24,11 @@ rts_tcb_t *rts_scheduler_current_on_cpu(rts_cpu_id_t cpu)
     return local == NULL ? NULL : local->current_task;
 }
 
+rts_tcb_t *rts_scheduler_current_get(void)
+{
+    return rts_scheduler_current_on_cpu(rts_cpu_current_id());
+}
+
 void rts_scheduler_set_current_on_cpu(rts_cpu_id_t cpu, rts_tcb_t *task)
 {
     rts_cpu_local_state_t *local = rts_scheduler_cpu_local(cpu);

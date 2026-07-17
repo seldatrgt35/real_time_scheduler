@@ -203,11 +203,6 @@ rts_tcb_t *rts_scheduler_select_highest_ready(void)
     return selected;
 }
 
-rts_tcb_t *rts_scheduler_current_get(void)
-{
-    return rts_scheduler_current_on_cpu(rts_cpu_current_id());
-}
-
 bool rts_scheduler_current_is_valid(void)
 {
     const rts_kernel_state_t *kernel = rts_kernel_state_get();
