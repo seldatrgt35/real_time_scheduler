@@ -61,6 +61,18 @@ typedef struct
     volatile uint32_t task_a_dispatch_count;
     volatile uint32_t task_b_dispatch_count;
     volatile uint32_t task_c_dispatch_count;
+    volatile uint32_t task_a_running_ticks;
+    volatile uint32_t task_b_running_ticks;
+    volatile uint32_t task_c_running_ticks;
+    volatile uint32_t task_a_stack_guard_ok;
+    volatile uint32_t task_b_stack_guard_ok;
+    volatile uint32_t task_c_stack_guard_ok;
+    volatile uint32_t task_a_last_execution_cycles;
+    volatile uint32_t task_b_last_execution_cycles;
+    volatile uint32_t task_c_last_execution_cycles;
+    volatile uint32_t task_a_max_execution_cycles;
+    volatile uint32_t task_b_max_execution_cycles;
+    volatile uint32_t task_c_max_execution_cycles;
     volatile uint32_t task_a_max_stack_used;
     volatile uint32_t task_b_max_stack_used;
     volatile uint32_t task_c_max_stack_used;

@@ -10,6 +10,7 @@
 #include "rts/rts_semaphore.h"
 #include "rts/rts_timer.h"
 #include "target.h"
+#include "target_led.h"
 #include "target_diagnostics.h"
 #include "target_tick.h"
 #include "time_internal.h"
@@ -20,7 +21,7 @@
 #include "power_internal.h"
 
 #define RTS_SMOKE_STACK_SIZE_BYTES 1024u
-#define RTS_SMOKE_GUARD_SIZE_BYTES 32u
+#define RTS_SMOKE_GUARD_SIZE_BYTES RTS_STACK_GUARD_SIZE_BYTES
 #define RTS_SMOKE_GUARD_VALUE      UINT8_C(0xa5)
 #define RTS_SMOKE_TASK_A_ID        UINT32_C(0xa11a0001)
 #define RTS_SMOKE_TASK_B_ID        UINT32_C(0xb22b0002)
@@ -192,6 +193,95 @@ static bool rts_smoke_guard_is_valid(const unsigned char *stack)
     return true;
 }
 
+/* Representative application work used by the board smoke test.  These are
+ * deliberately portable computations; a product can replace them with its
+ * sensor, control, CAN, or GPIO driver calls. */
+static volatile uint32_t g_sensor_filter_state;
+static volatile uint32_t g_control_output;
+static volatile uint32_t g_diagnostic_checksum;
+
+static void rts_automotive_sensor_step(void)
+{
+    uint32_t sample = g_sensor_filter_state;
+    uint32_t index;
+
+    for (index = 0u; index < 64u; ++index)
+    {
+        sample = (sample * 33u) + index + 17u;
+    }
+    g_sensor_filter_state = sample;
+}
+
+static void rts_automotive_control_step(void)
+{
+    uint32_t value = g_sensor_filter_state;
+    uint32_t index;
+
+    for (index = 0u; index < 32u; ++index)
+    {
+        value = (value ^ (value >> 3u)) + UINT32_C(0x1021);
+    }
+    g_control_output = value;
+}
+
+static void rts_automotive_diagnostic_step(void)
+{
+    uint32_t checksum = g_diagnostic_checksum;
+    uint32_t index;
+
+    for (index = 0u; index < 16u; ++index)
+    {
+        checksum ^= g_control_output + (index * UINT32_C(0x45d9));
+        checksum = (checksum << 5u) | (checksum >> 27u);
+    }
+    g_diagnostic_checksum = checksum;
+}
+
+static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
+{
+    uint32_t start = rts_s32k148_cycle_now();
+    uint32_t elapsed;
+
+    if (task == &g_task_a_argument)
+    {
+        rts_automotive_control_step();
+    }
+    else if (task == &g_task_b_argument)
+    {
+        rts_automotive_diagnostic_step();
+    }
+    else
+    {
+        rts_automotive_sensor_step();
+    }
+
+    elapsed = rts_s32k148_cycle_now() - start;
+    if (task == &g_task_a_argument)
+    {
+        g_rts_s32k148_smoke_record.task_a_last_execution_cycles = elapsed;
+        if (elapsed > g_rts_s32k148_smoke_record.task_a_max_execution_cycles)
+        {
+            g_rts_s32k148_smoke_record.task_a_max_execution_cycles = elapsed;
+        }
+    }
+    else if (task == &g_task_b_argument)
+    {
+        g_rts_s32k148_smoke_record.task_b_last_execution_cycles = elapsed;
+        if (elapsed > g_rts_s32k148_smoke_record.task_b_max_execution_cycles)
+        {
+            g_rts_s32k148_smoke_record.task_b_max_execution_cycles = elapsed;
+        }
+    }
+    else
+    {
+        g_rts_s32k148_smoke_record.task_c_last_execution_cycles = elapsed;
+        if (elapsed > g_rts_s32k148_smoke_record.task_c_max_execution_cycles)
+        {
+            g_rts_s32k148_smoke_record.task_c_max_execution_cycles = elapsed;
+        }
+    }
+}
+
 static void rts_smoke_task(void *argument)
 {
     rts_smoke_task_argument_t *task = (rts_smoke_task_argument_t *)argument;
@@ -231,7 +321,7 @@ static void rts_smoke_task(void *argument)
     *task->control_record = __get_CONTROL();
     if ((*task->control_record & CONTROL_SPSEL_Msk) == 0u ||
         (*task->control_record & CONTROL_FPCA_Msk) != 0u ||
-        (*task->psp_record & 15u) != 0u || *task->psp_record == 0u)
+        (*task->psp_record & 7u) != 0u || *task->psp_record == 0u)
     {
         g_rts_s32k148_smoke_record.failure_flags |=
             RTS_SMOKE_FAILURE_THREAD_STACK;
@@ -255,6 +345,15 @@ static void rts_smoke_task(void *argument)
 
     for (;;)
     {
+        rts_automotive_step_measure(task);
+
+        /* Visible hardware heartbeat from Task A.  The divider keeps the
+         * active-low red LED slow enough to observe on the EVB. */
+        if (task == &g_task_a_argument &&
+            ((*task->counter & UINT32_C(0xff)) == 0u))
+        {
+            rts_s32k148_red_led_toggle();
+        }
         ++(*task->counter);
         g_rts_s32k148_smoke_record.current_task_identifier = task->identifier;
         if (task != &g_task_a_argument)
@@ -299,6 +398,11 @@ static void rts_smoke_task(void *argument)
             if (current != NULL)
             {
                 uint32_t used = (uint32_t)rts_stack_watermark_update(current);
+                uint32_t running_ticks = current->diagnostic_running_ticks;
+#if RTS_ENABLE_RUNTIME_STATS
+                running_ticks += rts_kernel_tick_now() -
+                                 current->diagnostic_last_start_tick;
+#endif
 #if RTS_ENABLE_RUNTIME_STATS
                 uint32_t dispatch = current->diagnostic_dispatch_count;
 #else
@@ -307,16 +411,22 @@ static void rts_smoke_task(void *argument)
                 if (task == &g_task_a_argument)
                 {
                     g_rts_s32k148_smoke_record.task_a_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_a_running_ticks =
+                        running_ticks;
                     g_rts_s32k148_smoke_record.task_a_max_stack_used = used;
                 }
                 else if (task == &g_task_b_argument)
                 {
                     g_rts_s32k148_smoke_record.task_b_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_b_running_ticks =
+                        running_ticks;
                     g_rts_s32k148_smoke_record.task_b_max_stack_used = used;
                 }
                 else
                 {
                     g_rts_s32k148_smoke_record.task_c_dispatch_count = dispatch;
+                    g_rts_s32k148_smoke_record.task_c_running_ticks =
+                        running_ticks;
                     g_rts_s32k148_smoke_record.task_c_max_stack_used = used;
                 }
             }
@@ -363,10 +473,28 @@ static void rts_smoke_task(void *argument)
                     RTS_SMOKE_FAILURE_SEMAPHORE;
             }
         }
-        if (!rts_smoke_guard_is_valid(task->stack))
         {
-            g_rts_s32k148_smoke_record.failure_flags |=
-                RTS_SMOKE_FAILURE_STACK_GUARD;
+            bool guard_valid = rts_smoke_guard_is_valid(task->stack);
+            if (task == &g_task_a_argument)
+            {
+                g_rts_s32k148_smoke_record.task_a_stack_guard_ok =
+                    guard_valid ? 1u : 0u;
+            }
+            else if (task == &g_task_b_argument)
+            {
+                g_rts_s32k148_smoke_record.task_b_stack_guard_ok =
+                    guard_valid ? 1u : 0u;
+            }
+            else
+            {
+                g_rts_s32k148_smoke_record.task_c_stack_guard_ok =
+                    guard_valid ? 1u : 0u;
+            }
+            if (!guard_valid)
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_STACK_GUARD;
+            }
         }
         {
             uint32_t register_result =

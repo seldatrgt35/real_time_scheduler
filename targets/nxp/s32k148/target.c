@@ -6,6 +6,7 @@
 #include "target_device.h"
 #include "assert_internal.h"
 #include "fatal_internal.h"
+#include "target_led.h"
 
 extern int main(void);
 
@@ -76,6 +77,7 @@ _Noreturn void rts_s32k148_hardfault_capture(const uint32_t *stacked_frame,
 _Noreturn void rts_s32k148_reset_entry(void)
 {
     /* The smoke image deliberately retains the S32K148 reset clock source. */
+    rts_s32k148_led_initialize();
     __enable_irq();
     __DSB();
     __ISB();

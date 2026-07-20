@@ -63,6 +63,7 @@ set(RTS_S32K148_KERNEL_SOURCES
 
 add_library(rts_target_s32k148 STATIC
     target.c
+    target_led.c
     target_diagnostics.c
     target_port.c
     target_power.c
