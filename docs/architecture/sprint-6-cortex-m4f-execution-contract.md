@@ -91,6 +91,12 @@ and hardware-frame end are 16-byte aligned; this exceeds the ARM architectural
 preserves 8-byte exception frames and rejects conflicting startup settings.
 After software restore PSP points at `saved_sp + 0x20`; hardware exception return
 consumes 32 bytes and leaves the task PSP at its original 16-byte-aligned top.
+The 16-byte guarantee applies to the initial frame. Once Thread mode is
+executing, the AAPCS permits a task prologue to move PSP to an address that is
+only 8-byte aligned. PendSV therefore validates a runtime saved-SP at the
+Cortex-M architectural 8-byte boundary and must not reject a legal 8-byte,
+non-16-byte PSP; the caller-owned region and initial frame remain 16-byte
+aligned.
 The port's structural minimum is therefore 64 bytes with 16-byte granularity.
 This only guarantees frame construction; each application must budget additional
 stack for its call depth, local data, exceptions, and safety margin.

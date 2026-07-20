@@ -72,8 +72,11 @@ bool rts_stack_saved_sp_is_valid(const rts_tcb_t *task)
 #if RTS_ENABLE_STACK_GUARDS
     low += (uintptr_t)RTS_STACK_GUARD_SIZE_BYTES;
 #endif
+    /* The caller-owned region and initial frame use the public 16-byte
+     * contract.  A running Cortex-M task may subsequently have an 8-byte
+     * aligned PSP under AAPCS; diagnostics must accept that legal saved SP. */
     return low <= saved && saved < high &&
-           (saved % (uintptr_t)RTS_TASK_STACK_ALIGNMENT) == 0u;
+           (saved % (uintptr_t)sizeof(uint64_t)) == 0u;
 }
 
 size_t rts_stack_high_water_used_bytes(const rts_tcb_t *task)

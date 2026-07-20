@@ -79,7 +79,9 @@ int main(void)
     b_next = b->ready_node.next;
     a_priority = a->priority;
     b_priority = b->priority;
-    outgoing_saved_sp = a->stack_high - 128u;
+    /* A running Cortex-M task may legally leave an 8-byte, non-16-byte
+     * aligned PSP after its compiler-generated prologue. */
+    outgoing_saved_sp = a->stack_high - 120u;
     rts_scheduler_request_switch_if_needed(b);
     CHECK(rts_host_port_test_switch_request_pending());
     rts_host_port_test_consume_switch_request();

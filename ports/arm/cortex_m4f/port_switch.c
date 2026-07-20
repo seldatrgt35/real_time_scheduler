@@ -37,7 +37,12 @@ static bool rts_cm4f_saved_sp_is_valid(const rts_tcb_t *task,
     high = (uintptr_t)task->stack_high;
     saved = (uintptr_t)saved_stack_pointer;
     return low < high && saved >= low && saved <= high &&
-           (saved % (uintptr_t)RTS_TASK_STACK_ALIGNMENT) == 0u &&
+           /* The public stack region and initial frame are 16-byte aligned.
+            * Once a task has executed, the AAPCS/Cortex-M contract only
+            * requires the live PSP (and therefore the PendSV saved SP) to be
+            * 8-byte aligned.  A task prologue may legally move PSP to an
+            * address that is 8-byte, but not 16-byte, aligned. */
+           (saved % (uintptr_t)RTS_CM4F_ARCH_STACK_ALIGNMENT) == 0u &&
            (high - saved) >= RTS_CM4F_INITIAL_FRAME_SIZE_BYTES;
 }
 

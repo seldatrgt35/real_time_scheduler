@@ -73,7 +73,7 @@ expose partial state to Thread mode.
 The static port handoff contains outgoing/incoming TCB pointers, the complete
 immutable Sprint 5 snapshot, and the validated outgoing/incoming saved-SP values.
 Acquire calls `rts_scheduler_switch_acquire()`, making PENDING become ACTIVE, and
-checks identity, states, distinct tasks, 16-byte alignment, stack bounds, and
+checks identity, states, distinct tasks, 8-byte runtime-SP alignment, stack bounds, and
 room for the 64-byte basic context. It neither publishes outgoing SP nor
 completes the switch.
 
