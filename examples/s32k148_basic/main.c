@@ -10,6 +10,7 @@
 #include "rts/rts_semaphore.h"
 #include "rts/rts_timer.h"
 #include "target.h"
+#include "target_config.h"
 #include "target_led.h"
 #include "target_diagnostics.h"
 #include "target_tick.h"
@@ -241,6 +242,7 @@ static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
 {
     uint32_t start = rts_s32k148_cycle_now();
     uint32_t elapsed;
+    uint32_t elapsed_us;
 
     if (task == &g_task_a_argument)
     {
@@ -256,28 +258,45 @@ static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
     }
 
     elapsed = rts_s32k148_cycle_now() - start;
+    /* The target clock is 48 MHz: one microsecond is 48 DWT cycles. */
+    elapsed_us = elapsed / (RTS_S32K148_CORE_CLOCK_HZ / UINT32_C(1000000));
     if (task == &g_task_a_argument)
     {
         g_rts_s32k148_smoke_record.task_a_last_execution_cycles = elapsed;
+        g_rts_s32k148_smoke_record.task_a_last_execution_us = elapsed_us;
         if (elapsed > g_rts_s32k148_smoke_record.task_a_max_execution_cycles)
         {
             g_rts_s32k148_smoke_record.task_a_max_execution_cycles = elapsed;
+        }
+        if (elapsed_us > g_rts_s32k148_smoke_record.task_a_max_execution_us)
+        {
+            g_rts_s32k148_smoke_record.task_a_max_execution_us = elapsed_us;
         }
     }
     else if (task == &g_task_b_argument)
     {
         g_rts_s32k148_smoke_record.task_b_last_execution_cycles = elapsed;
+        g_rts_s32k148_smoke_record.task_b_last_execution_us = elapsed_us;
         if (elapsed > g_rts_s32k148_smoke_record.task_b_max_execution_cycles)
         {
             g_rts_s32k148_smoke_record.task_b_max_execution_cycles = elapsed;
+        }
+        if (elapsed_us > g_rts_s32k148_smoke_record.task_b_max_execution_us)
+        {
+            g_rts_s32k148_smoke_record.task_b_max_execution_us = elapsed_us;
         }
     }
     else
     {
         g_rts_s32k148_smoke_record.task_c_last_execution_cycles = elapsed;
+        g_rts_s32k148_smoke_record.task_c_last_execution_us = elapsed_us;
         if (elapsed > g_rts_s32k148_smoke_record.task_c_max_execution_cycles)
         {
             g_rts_s32k148_smoke_record.task_c_max_execution_cycles = elapsed;
+        }
+        if (elapsed_us > g_rts_s32k148_smoke_record.task_c_max_execution_us)
+        {
+            g_rts_s32k148_smoke_record.task_c_max_execution_us = elapsed_us;
         }
     }
 }
