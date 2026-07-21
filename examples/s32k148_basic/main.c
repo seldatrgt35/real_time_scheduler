@@ -431,44 +431,31 @@ static void StarTask_1000ms_VehicleHealth(void *context)
     star_can_publish(UINT32_C(0x810), &sample.value, sizeof(sample.value));
 }
 
+typedef void (*rts_automotive_work_fn_t)(void *context);
+
+static rts_automotive_work_fn_t rts_automotive_select_work(
+    const rts_smoke_task_argument_t *task)
+{
+    if (task == &g_task_a_argument) return StarTask_5ms_BrakeControl;
+    if (task == &g_task_b_argument) return StarTask_10ms_SteeringAssist;
+    if (task == &g_task_c_argument) return StarTask_25ms_CrashSafety;
+    if (task == &g_task_d_argument) return StarTask_50ms_BatteryThermal;
+    if (task == &g_task_e_argument) return StarTask_100ms_PowertrainManager;
+    if (task == &g_task_f_argument) return StarTask_200ms_Diagnostics;
+    if (task == &g_task_g_argument) return StarTask_500ms_NetworkGateway;
+    return StarTask_1000ms_VehicleHealth;
+}
+
 static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
 {
+    /* Resolve task dispatch before taking the timestamp.  The measured region
+     * therefore contains only the STAR application work function. */
+    rts_automotive_work_fn_t work = rts_automotive_select_work(task);
     uint32_t start = rts_s32k148_cycle_now();
     uint32_t elapsed;
     uint32_t elapsed_us;
 
-    if (task == &g_task_a_argument)
-    {
-        StarTask_5ms_BrakeControl(NULL);
-    }
-    else if (task == &g_task_b_argument)
-    {
-        StarTask_10ms_SteeringAssist(NULL);
-    }
-    else if (task == &g_task_c_argument)
-    {
-        StarTask_25ms_CrashSafety(NULL);
-    }
-    else if (task == &g_task_d_argument)
-    {
-        StarTask_50ms_BatteryThermal(NULL);
-    }
-    else if (task == &g_task_e_argument)
-    {
-        StarTask_100ms_PowertrainManager(NULL);
-    }
-    else if (task == &g_task_f_argument)
-    {
-        StarTask_200ms_Diagnostics(NULL);
-    }
-    else if (task == &g_task_g_argument)
-    {
-        StarTask_500ms_NetworkGateway(NULL);
-    }
-    else
-    {
-        StarTask_1000ms_VehicleHealth(NULL);
-    }
+    work(NULL);
 
     elapsed = rts_s32k148_cycle_now() - start;
     /* The target clock is 48 MHz: one microsecond is 48 DWT cycles. */
