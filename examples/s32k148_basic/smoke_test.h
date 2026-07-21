@@ -19,7 +19,12 @@ enum
     RTS_SMOKE_FAILURE_YIELD = UINT32_C(1) << 9,
     RTS_SMOKE_FAILURE_CREATE_C = UINT32_C(1) << 10,
     RTS_SMOKE_FAILURE_SEMAPHORE = UINT32_C(1) << 11,
-    RTS_SMOKE_FAILURE_TIMER = UINT32_C(1) << 12
+    RTS_SMOKE_FAILURE_TIMER = UINT32_C(1) << 12,
+    RTS_SMOKE_FAILURE_CREATE_D = UINT32_C(1) << 13,
+    RTS_SMOKE_FAILURE_CREATE_E = UINT32_C(1) << 14,
+    RTS_SMOKE_FAILURE_CREATE_F = UINT32_C(1) << 15,
+    RTS_SMOKE_FAILURE_CREATE_G = UINT32_C(1) << 16,
+    RTS_SMOKE_FAILURE_CREATE_H = UINT32_C(1) << 17
 };
 
 typedef struct
@@ -82,6 +87,29 @@ typedef struct
     volatile uint32_t task_a_max_stack_used;
     volatile uint32_t task_b_max_stack_used;
     volatile uint32_t task_c_max_stack_used;
+    volatile uint32_t task_d_count;
+    volatile uint32_t task_e_count;
+    volatile uint32_t task_f_count;
+    volatile uint32_t task_g_count;
+    volatile uint32_t task_h_count;
+    volatile uint32_t task_d_argument_seen;
+    volatile uint32_t task_e_argument_seen;
+    volatile uint32_t task_f_argument_seen;
+    volatile uint32_t task_g_argument_seen;
+    volatile uint32_t task_h_argument_seen;
+    volatile uint32_t task_d_psp, task_e_psp, task_f_psp, task_g_psp, task_h_psp;
+    volatile uint32_t task_d_msp, task_e_msp, task_f_msp, task_g_msp, task_h_msp;
+    volatile uint32_t task_d_control, task_e_control, task_f_control, task_g_control, task_h_control;
+    volatile uint32_t task_d_stack_guard_ok, task_e_stack_guard_ok;
+    volatile uint32_t task_f_stack_guard_ok, task_g_stack_guard_ok, task_h_stack_guard_ok;
+    volatile uint32_t task_d_last_execution_cycles, task_e_last_execution_cycles;
+    volatile uint32_t task_f_last_execution_cycles, task_g_last_execution_cycles, task_h_last_execution_cycles;
+    volatile uint32_t task_d_max_execution_cycles, task_e_max_execution_cycles;
+    volatile uint32_t task_f_max_execution_cycles, task_g_max_execution_cycles, task_h_max_execution_cycles;
+    volatile uint32_t task_d_last_execution_us, task_e_last_execution_us;
+    volatile uint32_t task_f_last_execution_us, task_g_last_execution_us, task_h_last_execution_us;
+    volatile uint32_t task_d_max_execution_us, task_e_max_execution_us;
+    volatile uint32_t task_f_max_execution_us, task_g_max_execution_us, task_h_max_execution_us;
     volatile uint32_t timer_periodic_callback_count;
     volatile uint32_t timer_one_shot_callback_count;
     volatile uint32_t timer_callback_psp;

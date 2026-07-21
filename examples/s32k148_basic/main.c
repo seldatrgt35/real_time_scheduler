@@ -27,6 +27,11 @@
 #define RTS_SMOKE_TASK_A_ID        UINT32_C(0xa11a0001)
 #define RTS_SMOKE_TASK_B_ID        UINT32_C(0xb22b0002)
 #define RTS_SMOKE_TASK_C_ID        UINT32_C(0xc33c0003)
+#define RTS_SMOKE_TASK_D_ID        UINT32_C(0xd44d0004)
+#define RTS_SMOKE_TASK_E_ID        UINT32_C(0xe55e0005)
+#define RTS_SMOKE_TASK_F_ID        UINT32_C(0xf66f0006)
+#define RTS_SMOKE_TASK_G_ID        UINT32_C(0xa77a0007)
+#define RTS_SMOKE_TASK_H_ID        UINT32_C(0xb88b0008)
 
 typedef struct
 {
@@ -38,11 +43,17 @@ typedef struct
     volatile uint32_t *control_record;
     unsigned char *stack;
     const uint32_t *register_patterns;
+    rts_tick_t work_delay_ticks;
 } rts_smoke_task_argument_t;
 
 RTS_TASK_STACK_DECLARE(g_task_a_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_b_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_c_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_d_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_e_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_f_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_g_stack, RTS_SMOKE_STACK_SIZE_BYTES);
+RTS_TASK_STACK_DECLARE(g_task_h_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 
 rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
 static rts_semaphore_t g_smoke_semaphore;
@@ -140,6 +151,26 @@ static const uint32_t g_task_c_patterns[8] = {
     UINT32_C(0xc8080808), UINT32_C(0xc9090909),
     UINT32_C(0xca101010), UINT32_C(0xcb111111)
 };
+static const uint32_t g_task_d_patterns[8] = {
+    UINT32_C(0xd4040404), UINT32_C(0xd5050505), UINT32_C(0xd6060606), UINT32_C(0xd7070707),
+    UINT32_C(0xd8080808), UINT32_C(0xd9090909), UINT32_C(0xda101010), UINT32_C(0xdb111111)
+};
+static const uint32_t g_task_e_patterns[8] = {
+    UINT32_C(0xe4040404), UINT32_C(0xe5050505), UINT32_C(0xe6060606), UINT32_C(0xe7070707),
+    UINT32_C(0xe8080808), UINT32_C(0xe9090909), UINT32_C(0xea101010), UINT32_C(0xeb111111)
+};
+static const uint32_t g_task_f_patterns[8] = {
+    UINT32_C(0xf4040404), UINT32_C(0xf5050505), UINT32_C(0xf6060606), UINT32_C(0xf7070707),
+    UINT32_C(0xf8080808), UINT32_C(0xf9090909), UINT32_C(0xfa101010), UINT32_C(0xfb111111)
+};
+static const uint32_t g_task_g_patterns[8] = {
+    UINT32_C(0x74040404), UINT32_C(0x75050505), UINT32_C(0x76060606), UINT32_C(0x77070707),
+    UINT32_C(0x78080808), UINT32_C(0x79090909), UINT32_C(0x7a101010), UINT32_C(0x7b111111)
+};
+static const uint32_t g_task_h_patterns[8] = {
+    UINT32_C(0x84040404), UINT32_C(0x85050505), UINT32_C(0x86060606), UINT32_C(0x87070707),
+    UINT32_C(0x88080808), UINT32_C(0x89090909), UINT32_C(0x8a101010), UINT32_C(0x8b111111)
+};
 
 static rts_smoke_task_argument_t g_task_a_argument = {
     RTS_SMOKE_TASK_A_ID,
@@ -149,7 +180,7 @@ static rts_smoke_task_argument_t g_task_a_argument = {
     &g_rts_s32k148_smoke_record.task_a_msp,
     &g_rts_s32k148_smoke_record.task_a_control,
     g_task_a_stack,
-    g_task_a_patterns
+    g_task_a_patterns, 1u
 };
 static rts_smoke_task_argument_t g_task_b_argument = {
     RTS_SMOKE_TASK_B_ID,
@@ -159,7 +190,7 @@ static rts_smoke_task_argument_t g_task_b_argument = {
     &g_rts_s32k148_smoke_record.task_b_msp,
     &g_rts_s32k148_smoke_record.task_b_control,
     g_task_b_stack,
-    g_task_b_patterns
+    g_task_b_patterns, 3u
 };
 static rts_smoke_task_argument_t g_task_c_argument = {
     RTS_SMOKE_TASK_C_ID,
@@ -169,7 +200,37 @@ static rts_smoke_task_argument_t g_task_c_argument = {
     &g_rts_s32k148_smoke_record.task_c_msp,
     &g_rts_s32k148_smoke_record.task_c_control,
     g_task_c_stack,
-    g_task_c_patterns
+    g_task_c_patterns, 2u
+};
+static rts_smoke_task_argument_t g_task_d_argument = {
+    RTS_SMOKE_TASK_D_ID, &g_rts_s32k148_smoke_record.task_d_count,
+    &g_rts_s32k148_smoke_record.task_d_argument_seen, &g_rts_s32k148_smoke_record.task_d_psp,
+    &g_rts_s32k148_smoke_record.task_d_msp, &g_rts_s32k148_smoke_record.task_d_control,
+    g_task_d_stack, g_task_d_patterns, 4u
+};
+static rts_smoke_task_argument_t g_task_e_argument = {
+    RTS_SMOKE_TASK_E_ID, &g_rts_s32k148_smoke_record.task_e_count,
+    &g_rts_s32k148_smoke_record.task_e_argument_seen, &g_rts_s32k148_smoke_record.task_e_psp,
+    &g_rts_s32k148_smoke_record.task_e_msp, &g_rts_s32k148_smoke_record.task_e_control,
+    g_task_e_stack, g_task_e_patterns, 5u
+};
+static rts_smoke_task_argument_t g_task_f_argument = {
+    RTS_SMOKE_TASK_F_ID, &g_rts_s32k148_smoke_record.task_f_count,
+    &g_rts_s32k148_smoke_record.task_f_argument_seen, &g_rts_s32k148_smoke_record.task_f_psp,
+    &g_rts_s32k148_smoke_record.task_f_msp, &g_rts_s32k148_smoke_record.task_f_control,
+    g_task_f_stack, g_task_f_patterns, 6u
+};
+static rts_smoke_task_argument_t g_task_g_argument = {
+    RTS_SMOKE_TASK_G_ID, &g_rts_s32k148_smoke_record.task_g_count,
+    &g_rts_s32k148_smoke_record.task_g_argument_seen, &g_rts_s32k148_smoke_record.task_g_psp,
+    &g_rts_s32k148_smoke_record.task_g_msp, &g_rts_s32k148_smoke_record.task_g_control,
+    g_task_g_stack, g_task_g_patterns, 7u
+};
+static rts_smoke_task_argument_t g_task_h_argument = {
+    RTS_SMOKE_TASK_H_ID, &g_rts_s32k148_smoke_record.task_h_count,
+    &g_rts_s32k148_smoke_record.task_h_argument_seen, &g_rts_s32k148_smoke_record.task_h_psp,
+    &g_rts_s32k148_smoke_record.task_h_msp, &g_rts_s32k148_smoke_record.task_h_control,
+    g_task_h_stack, g_task_h_patterns, 8u
 };
 
 static void rts_smoke_guard_initialize(unsigned char *stack)
@@ -200,6 +261,11 @@ static bool rts_smoke_guard_is_valid(const unsigned char *stack)
 static volatile uint32_t g_sensor_filter_state;
 static volatile uint32_t g_control_output;
 static volatile uint32_t g_diagnostic_checksum;
+static volatile uint32_t g_brake_command;
+static volatile uint32_t g_steering_state;
+static volatile uint32_t g_can_payload;
+static volatile uint32_t g_thermal_state;
+static volatile uint32_t g_log_checksum;
 
 static void rts_automotive_sensor_step(void)
 {
@@ -238,6 +304,51 @@ static void rts_automotive_diagnostic_step(void)
     g_diagnostic_checksum = checksum;
 }
 
+static void rts_automotive_brake_step(void)
+{
+    uint32_t value = g_brake_command;
+    uint32_t index;
+    for (index = 0u; index < 24u; ++index)
+        value = (value * 17u) ^ (index + UINT32_C(0x55aa));
+    g_brake_command = value;
+}
+
+static void rts_automotive_steering_step(void)
+{
+    uint32_t value = g_steering_state;
+    uint32_t index;
+    for (index = 0u; index < 48u; ++index)
+        value = (value << 3u) ^ (value >> 2u) ^ (index * UINT32_C(0x31));
+    g_steering_state = value;
+}
+
+static void rts_automotive_can_step(void)
+{
+    uint32_t value = g_can_payload;
+    uint32_t index;
+    for (index = 0u; index < 80u; ++index)
+        value = (value >> 1u) ^ (value << 7u) ^ UINT32_C(0x1edc6f41);
+    g_can_payload = value;
+}
+
+static void rts_automotive_thermal_step(void)
+{
+    uint32_t value = g_thermal_state;
+    uint32_t index;
+    for (index = 0u; index < 40u; ++index)
+        value += (value ^ (index * UINT32_C(0x9e37))) >> 1u;
+    g_thermal_state = value;
+}
+
+static void rts_automotive_logging_step(void)
+{
+    uint32_t value = g_log_checksum;
+    uint32_t index;
+    for (index = 0u; index < 12u; ++index)
+        value = (value << 5u) - value + index + UINT32_C(0x1001);
+    g_log_checksum = value;
+}
+
 static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
 {
     uint32_t start = rts_s32k148_cycle_now();
@@ -252,9 +363,29 @@ static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
     {
         rts_automotive_diagnostic_step();
     }
-    else
+    else if (task == &g_task_c_argument)
     {
         rts_automotive_sensor_step();
+    }
+    else if (task == &g_task_d_argument)
+    {
+        rts_automotive_brake_step();
+    }
+    else if (task == &g_task_e_argument)
+    {
+        rts_automotive_steering_step();
+    }
+    else if (task == &g_task_f_argument)
+    {
+        rts_automotive_can_step();
+    }
+    else if (task == &g_task_g_argument)
+    {
+        rts_automotive_thermal_step();
+    }
+    else
+    {
+        rts_automotive_logging_step();
     }
 
     elapsed = rts_s32k148_cycle_now() - start;
@@ -288,15 +419,24 @@ static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
     }
     else
     {
-        g_rts_s32k148_smoke_record.task_c_last_execution_cycles = elapsed;
-        g_rts_s32k148_smoke_record.task_c_last_execution_us = elapsed_us;
-        if (elapsed > g_rts_s32k148_smoke_record.task_c_max_execution_cycles)
+        volatile uint32_t *last_cycles = &g_rts_s32k148_smoke_record.task_c_last_execution_cycles;
+        volatile uint32_t *last_us = &g_rts_s32k148_smoke_record.task_c_last_execution_us;
+        volatile uint32_t *max_cycles = &g_rts_s32k148_smoke_record.task_c_max_execution_cycles;
+        volatile uint32_t *max_us = &g_rts_s32k148_smoke_record.task_c_max_execution_us;
+        if (task == &g_task_d_argument) { last_cycles = &g_rts_s32k148_smoke_record.task_d_last_execution_cycles; last_us = &g_rts_s32k148_smoke_record.task_d_last_execution_us; max_cycles = &g_rts_s32k148_smoke_record.task_d_max_execution_cycles; max_us = &g_rts_s32k148_smoke_record.task_d_max_execution_us; }
+        else if (task == &g_task_e_argument) { last_cycles = &g_rts_s32k148_smoke_record.task_e_last_execution_cycles; last_us = &g_rts_s32k148_smoke_record.task_e_last_execution_us; max_cycles = &g_rts_s32k148_smoke_record.task_e_max_execution_cycles; max_us = &g_rts_s32k148_smoke_record.task_e_max_execution_us; }
+        else if (task == &g_task_f_argument) { last_cycles = &g_rts_s32k148_smoke_record.task_f_last_execution_cycles; last_us = &g_rts_s32k148_smoke_record.task_f_last_execution_us; max_cycles = &g_rts_s32k148_smoke_record.task_f_max_execution_cycles; max_us = &g_rts_s32k148_smoke_record.task_f_max_execution_us; }
+        else if (task == &g_task_g_argument) { last_cycles = &g_rts_s32k148_smoke_record.task_g_last_execution_cycles; last_us = &g_rts_s32k148_smoke_record.task_g_last_execution_us; max_cycles = &g_rts_s32k148_smoke_record.task_g_max_execution_cycles; max_us = &g_rts_s32k148_smoke_record.task_g_max_execution_us; }
+        else if (task == &g_task_h_argument) { last_cycles = &g_rts_s32k148_smoke_record.task_h_last_execution_cycles; last_us = &g_rts_s32k148_smoke_record.task_h_last_execution_us; max_cycles = &g_rts_s32k148_smoke_record.task_h_max_execution_cycles; max_us = &g_rts_s32k148_smoke_record.task_h_max_execution_us; }
+        *last_cycles = elapsed;
+        *last_us = elapsed_us;
+        if (elapsed > *max_cycles)
         {
-            g_rts_s32k148_smoke_record.task_c_max_execution_cycles = elapsed;
+            *max_cycles = elapsed;
         }
-        if (elapsed_us > g_rts_s32k148_smoke_record.task_c_max_execution_us)
+        if (elapsed_us > *max_us)
         {
-            g_rts_s32k148_smoke_record.task_c_max_execution_us = elapsed_us;
+            *max_us = elapsed_us;
         }
     }
 }
@@ -319,6 +459,11 @@ static void rts_smoke_task(void *argument)
     {
         expected_id = RTS_SMOKE_TASK_C_ID;
     }
+    else if (task == &g_task_d_argument) { expected_id = RTS_SMOKE_TASK_D_ID; }
+    else if (task == &g_task_e_argument) { expected_id = RTS_SMOKE_TASK_E_ID; }
+    else if (task == &g_task_f_argument) { expected_id = RTS_SMOKE_TASK_F_ID; }
+    else if (task == &g_task_g_argument) { expected_id = RTS_SMOKE_TASK_G_ID; }
+    else if (task == &g_task_h_argument) { expected_id = RTS_SMOKE_TASK_H_ID; }
     else
     {
         g_rts_s32k148_smoke_record.failure_flags |=
@@ -508,6 +653,11 @@ static void rts_smoke_task(void *argument)
             {
                 g_rts_s32k148_smoke_record.task_c_stack_guard_ok =
                     guard_valid ? 1u : 0u;
+                if (task == &g_task_d_argument) g_rts_s32k148_smoke_record.task_d_stack_guard_ok = guard_valid ? 1u : 0u;
+                else if (task == &g_task_e_argument) g_rts_s32k148_smoke_record.task_e_stack_guard_ok = guard_valid ? 1u : 0u;
+                else if (task == &g_task_f_argument) g_rts_s32k148_smoke_record.task_f_stack_guard_ok = guard_valid ? 1u : 0u;
+                else if (task == &g_task_g_argument) g_rts_s32k148_smoke_record.task_g_stack_guard_ok = guard_valid ? 1u : 0u;
+                else if (task == &g_task_h_argument) g_rts_s32k148_smoke_record.task_h_stack_guard_ok = guard_valid ? 1u : 0u;
             }
             if (!guard_valid)
             {
@@ -578,7 +728,7 @@ static void rts_smoke_task(void *argument)
             }
             ++g_rts_s32k148_smoke_record.task_a_wakeup_count;
         }
-        else if (rts_task_delay(task == &g_task_b_argument ? 3u : 2u) !=
+        else if (rts_task_delay(task->work_delay_ticks) !=
                  RTS_STATUS_OK)
         {
             g_rts_s32k148_smoke_record.failure_flags |=
@@ -592,6 +742,8 @@ int main(void)
     rts_task_handle_t task_a = NULL;
     rts_task_handle_t task_b = NULL;
     rts_task_handle_t task_c = NULL;
+    rts_task_handle_t task_d = NULL, task_e = NULL, task_f = NULL;
+    rts_task_handle_t task_g = NULL, task_h = NULL;
     const rts_task_config_t config_a = {
         .entry = rts_smoke_task,
         .argument = &g_task_a_argument,
@@ -622,6 +774,11 @@ int main(void)
         .relative_deadline = 30u,
         .execution_budget = 0u
     };
+    const rts_task_config_t config_d = { .entry = rts_smoke_task, .argument = &g_task_d_argument, .stack_buffer = g_task_d_stack, .stack_size_bytes = sizeof(g_task_d_stack), .priority = 4u, .period = 50u, .relative_deadline = 50u, .execution_budget = 0u };
+    const rts_task_config_t config_e = { .entry = rts_smoke_task, .argument = &g_task_e_argument, .stack_buffer = g_task_e_stack, .stack_size_bytes = sizeof(g_task_e_stack), .priority = 5u, .period = 60u, .relative_deadline = 60u, .execution_budget = 0u };
+    const rts_task_config_t config_f = { .entry = rts_smoke_task, .argument = &g_task_f_argument, .stack_buffer = g_task_f_stack, .stack_size_bytes = sizeof(g_task_f_stack), .priority = 6u, .period = 70u, .relative_deadline = 70u, .execution_budget = 0u };
+    const rts_task_config_t config_g = { .entry = rts_smoke_task, .argument = &g_task_g_argument, .stack_buffer = g_task_g_stack, .stack_size_bytes = sizeof(g_task_g_stack), .priority = 7u, .period = 80u, .relative_deadline = 80u, .execution_budget = 0u };
+    const rts_task_config_t config_h = { .entry = rts_smoke_task, .argument = &g_task_h_argument, .stack_buffer = g_task_h_stack, .stack_size_bytes = sizeof(g_task_h_stack), .priority = 8u, .period = 90u, .relative_deadline = 90u, .execution_budget = 0u };
     const rts_timer_config_t periodic_timer_config = {
         .period = 25u,
         .callback = rts_smoke_periodic_timer_callback,
@@ -639,6 +796,11 @@ int main(void)
     rts_smoke_guard_initialize(g_task_a_stack);
     rts_smoke_guard_initialize(g_task_b_stack);
     rts_smoke_guard_initialize(g_task_c_stack);
+    rts_smoke_guard_initialize(g_task_d_stack);
+    rts_smoke_guard_initialize(g_task_e_stack);
+    rts_smoke_guard_initialize(g_task_f_stack);
+    rts_smoke_guard_initialize(g_task_g_stack);
+    rts_smoke_guard_initialize(g_task_h_stack);
     if (rts_semaphore_init(&g_smoke_semaphore, 0u, 1u) != RTS_STATUS_OK)
     {
         g_rts_s32k148_smoke_record.failure_flags |=
@@ -680,6 +842,11 @@ int main(void)
             RTS_SMOKE_FAILURE_CREATE_C;
         return 4;
     }
+    if (rts_task_create(&config_d, &task_d) != RTS_STATUS_OK) { g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_CREATE_D; return 7; }
+    if (rts_task_create(&config_e, &task_e) != RTS_STATUS_OK) { g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_CREATE_E; return 8; }
+    if (rts_task_create(&config_f, &task_f) != RTS_STATUS_OK) { g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_CREATE_F; return 9; }
+    if (rts_task_create(&config_g, &task_g) != RTS_STATUS_OK) { g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_CREATE_G; return 10; }
+    if (rts_task_create(&config_h, &task_h) != RTS_STATUS_OK) { g_rts_s32k148_smoke_record.failure_flags |= RTS_SMOKE_FAILURE_CREATE_H; return 11; }
     if (rts_timer_init(&periodic_timer_config, &g_periodic_timer) !=
             RTS_STATUS_OK ||
         rts_timer_init(&one_shot_timer_config, &g_one_shot_timer) !=
