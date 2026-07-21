@@ -131,6 +131,7 @@ endforeach()
 target_link_libraries(rts_example_s32k148_basic PRIVATE
     rts_target_s32k148
     rts_cortex_m4f_port
+    gcc
 )
 target_link_options(rts_example_s32k148_basic PRIVATE
     -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
