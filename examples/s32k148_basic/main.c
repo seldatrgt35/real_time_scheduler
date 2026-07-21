@@ -46,6 +46,16 @@ typedef struct
     rts_tick_t work_delay_ticks;
 } rts_smoke_task_argument_t;
 
+typedef struct
+{
+    uint16_t adc[8];
+    uint32_t can_id;
+    float value;
+    float confidence;
+    uint8_t state;
+    uint8_t fault;
+} StarAutomotiveSample;
+
 RTS_TASK_STACK_DECLARE(g_task_a_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_b_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_c_stack, RTS_SMOKE_STACK_SIZE_BYTES);
@@ -180,7 +190,7 @@ static rts_smoke_task_argument_t g_task_a_argument = {
     &g_rts_s32k148_smoke_record.task_a_msp,
     &g_rts_s32k148_smoke_record.task_a_control,
     g_task_a_stack,
-    g_task_a_patterns, 1u
+    g_task_a_patterns, 5u
 };
 static rts_smoke_task_argument_t g_task_b_argument = {
     RTS_SMOKE_TASK_B_ID,
@@ -190,7 +200,7 @@ static rts_smoke_task_argument_t g_task_b_argument = {
     &g_rts_s32k148_smoke_record.task_b_msp,
     &g_rts_s32k148_smoke_record.task_b_control,
     g_task_b_stack,
-    g_task_b_patterns, 3u
+    g_task_b_patterns, 10u
 };
 static rts_smoke_task_argument_t g_task_c_argument = {
     RTS_SMOKE_TASK_C_ID,
@@ -200,37 +210,37 @@ static rts_smoke_task_argument_t g_task_c_argument = {
     &g_rts_s32k148_smoke_record.task_c_msp,
     &g_rts_s32k148_smoke_record.task_c_control,
     g_task_c_stack,
-    g_task_c_patterns, 2u
+    g_task_c_patterns, 25u
 };
 static rts_smoke_task_argument_t g_task_d_argument = {
     RTS_SMOKE_TASK_D_ID, &g_rts_s32k148_smoke_record.task_d_count,
     &g_rts_s32k148_smoke_record.task_d_argument_seen, &g_rts_s32k148_smoke_record.task_d_psp,
     &g_rts_s32k148_smoke_record.task_d_msp, &g_rts_s32k148_smoke_record.task_d_control,
-    g_task_d_stack, g_task_d_patterns, 4u
+    g_task_d_stack, g_task_d_patterns, 50u
 };
 static rts_smoke_task_argument_t g_task_e_argument = {
     RTS_SMOKE_TASK_E_ID, &g_rts_s32k148_smoke_record.task_e_count,
     &g_rts_s32k148_smoke_record.task_e_argument_seen, &g_rts_s32k148_smoke_record.task_e_psp,
     &g_rts_s32k148_smoke_record.task_e_msp, &g_rts_s32k148_smoke_record.task_e_control,
-    g_task_e_stack, g_task_e_patterns, 5u
+    g_task_e_stack, g_task_e_patterns, 100u
 };
 static rts_smoke_task_argument_t g_task_f_argument = {
     RTS_SMOKE_TASK_F_ID, &g_rts_s32k148_smoke_record.task_f_count,
     &g_rts_s32k148_smoke_record.task_f_argument_seen, &g_rts_s32k148_smoke_record.task_f_psp,
     &g_rts_s32k148_smoke_record.task_f_msp, &g_rts_s32k148_smoke_record.task_f_control,
-    g_task_f_stack, g_task_f_patterns, 6u
+    g_task_f_stack, g_task_f_patterns, 200u
 };
 static rts_smoke_task_argument_t g_task_g_argument = {
     RTS_SMOKE_TASK_G_ID, &g_rts_s32k148_smoke_record.task_g_count,
     &g_rts_s32k148_smoke_record.task_g_argument_seen, &g_rts_s32k148_smoke_record.task_g_psp,
     &g_rts_s32k148_smoke_record.task_g_msp, &g_rts_s32k148_smoke_record.task_g_control,
-    g_task_g_stack, g_task_g_patterns, 7u
+    g_task_g_stack, g_task_g_patterns, 500u
 };
 static rts_smoke_task_argument_t g_task_h_argument = {
     RTS_SMOKE_TASK_H_ID, &g_rts_s32k148_smoke_record.task_h_count,
     &g_rts_s32k148_smoke_record.task_h_argument_seen, &g_rts_s32k148_smoke_record.task_h_psp,
     &g_rts_s32k148_smoke_record.task_h_msp, &g_rts_s32k148_smoke_record.task_h_control,
-    g_task_h_stack, g_task_h_patterns, 8u
+    g_task_h_stack, g_task_h_patterns, 1000u
 };
 
 static void rts_smoke_guard_initialize(unsigned char *stack)
@@ -258,95 +268,167 @@ static bool rts_smoke_guard_is_valid(const unsigned char *stack)
 /* Representative application work used by the board smoke test.  These are
  * deliberately portable computations; a product can replace them with its
  * sensor, control, CAN, or GPIO driver calls. */
-static volatile uint32_t g_sensor_filter_state;
-static volatile uint32_t g_control_output;
-static volatile uint32_t g_diagnostic_checksum;
-static volatile uint32_t g_brake_command;
-static volatile uint32_t g_steering_state;
-static volatile uint32_t g_can_payload;
-static volatile uint32_t g_thermal_state;
-static volatile uint32_t g_log_checksum;
+static volatile uint32_t g_star_benchmark_sink;
 
-static void rts_automotive_sensor_step(void)
+static uint16_t star_adc_read(uint8_t channel)
 {
-    uint32_t sample = g_sensor_filter_state;
-    uint32_t index;
+    uint32_t seed = rts_s32k148_cycle_now() ^ ((uint32_t)channel * 7919u);
+    return (uint16_t)((seed ^ (seed >> 7u)) & UINT32_C(0x0fff));
+}
 
-    for (index = 0u; index < 64u; ++index)
+static void star_can_publish(uint32_t id, const void *payload, size_t length)
+{
+    const uint8_t *bytes = (const uint8_t *)payload;
+    size_t index;
+    g_star_benchmark_sink ^= id + (uint32_t)length;
+    for (index = 0u; index < length; ++index)
+        g_star_benchmark_sink = (g_star_benchmark_sink << 3u) ^ bytes[index];
+}
+
+static uint32_t brake_sample_inputs(StarAutomotiveSample *sample)
+{
+    uint32_t checksum = 0u;
+    uint8_t channel;
+    for (channel = 0u; channel < 8u; ++channel)
     {
-        sample = (sample * 33u) + index + 17u;
+        sample->adc[channel] = star_adc_read(channel);
+        checksum += sample->adc[channel] * (uint32_t)(channel + 1u);
+        if (sample->adc[channel] > 3800u) sample->fault++;
+        else if (sample->adc[channel] < 120u) sample->fault += 2u;
+        else sample->confidence += ((sample->adc[channel] & 0x10u) != 0u) ? 0.25f : 0.10f;
     }
-    g_sensor_filter_state = sample;
+    return checksum;
 }
 
-static void rts_automotive_control_step(void)
+static float brake_estimate_slip(StarAutomotiveSample *sample, uint32_t checksum)
 {
-    uint32_t value = g_sensor_filter_state;
-    uint32_t index;
-
-    for (index = 0u; index < 32u; ++index)
+    float slip = 0.0f;
+    uint8_t wheel;
+    for (wheel = 0u; wheel < 4u; ++wheel)
     {
-        value = (value ^ (value >> 3u)) + UINT32_C(0x1021);
+        float delta = (float)sample->adc[wheel] - (float)sample->adc[wheel + 4u];
+        if (delta > 900.0f) slip += 3.5f;
+        else if (delta > 450.0f) slip += 2.0f;
+        else if (delta < -450.0f) slip -= 1.5f;
+        else slip += delta * 0.001f;
     }
-    g_control_output = value;
+    return slip + (((checksum & 3u) == 0u) ? 1.0f : 0.0f);
 }
 
-static void rts_automotive_diagnostic_step(void)
+static void StarTask_5ms_BrakeControl(void *context)
 {
-    uint32_t checksum = g_diagnostic_checksum;
-    uint32_t index;
+    StarAutomotiveSample sample = {0};
+    uint32_t checksum = brake_sample_inputs(&sample);
+    float slip = brake_estimate_slip(&sample, checksum);
+    uint8_t command = (sample.fault > 3u) ? 0u : ((slip > 4.0f) ? 3u : 1u);
+    (void)context;
+    rts_s32k148_red_led_set(command == 3u);
+    if (command > 1u) star_can_publish(UINT32_C(0x180), &sample, sizeof(sample));
+    else g_star_benchmark_sink += checksum;
+}
 
-    for (index = 0u; index < 16u; ++index)
+static void StarTask_10ms_SteeringAssist(void *context)
+{
+    StarAutomotiveSample sample = {0};
+    uint32_t effort = 0u;
+    uint8_t index;
+    (void)context;
+    for (index = 0u; index < 6u; ++index)
     {
-        checksum ^= g_control_output + (index * UINT32_C(0x45d9));
-        checksum = (checksum << 5u) | (checksum >> 27u);
+        sample.adc[index] = star_adc_read((uint8_t)(index + 8u));
+        effort += (sample.adc[index] > 3000u) ? 9u : ((sample.adc[index] < 300u) ? 11u : 3u);
     }
-    g_diagnostic_checksum = checksum;
+    sample.value = (float)effort * 0.125f;
+    rts_s32k148_red_led_set(sample.value > 12.0f);
+    star_can_publish(UINT32_C(0x220), &sample.value, sizeof(sample.value));
 }
 
-static void rts_automotive_brake_step(void)
+static void StarTask_25ms_CrashSafety(void *context)
 {
-    uint32_t value = g_brake_command;
-    uint32_t index;
-    for (index = 0u; index < 24u; ++index)
-        value = (value * 17u) ^ (index + UINT32_C(0x55aa));
-    g_brake_command = value;
+    StarAutomotiveSample sample = {0};
+    uint32_t energy = 0u;
+    uint8_t axis;
+    (void)context;
+    for (axis = 0u; axis < 6u; ++axis)
+    {
+        sample.adc[axis] = star_adc_read((uint8_t)(axis + 16u));
+        energy += (uint32_t)sample.adc[axis] * sample.adc[axis];
+        if (sample.adc[axis] > 3500u) sample.fault += 3u;
+    }
+    sample.state = (energy > 9000000u || sample.fault > 2u) ? 3u : 0u;
+    rts_s32k148_red_led_set(sample.state >= 3u);
+    if (sample.state >= 3u) star_can_publish(UINT32_C(0x300), &sample, sizeof(sample));
 }
 
-static void rts_automotive_steering_step(void)
+static void StarTask_50ms_BatteryThermal(void *context)
 {
-    uint32_t value = g_steering_state;
-    uint32_t index;
-    for (index = 0u; index < 48u; ++index)
-        value = (value << 3u) ^ (value >> 2u) ^ (index * UINT32_C(0x31));
-    g_steering_state = value;
+    StarAutomotiveSample sample = {0};
+    uint32_t hot_cells = 0u;
+    uint8_t cell;
+    (void)context;
+    for (cell = 0u; cell < 8u; ++cell)
+    {
+        sample.adc[cell] = star_adc_read((uint8_t)(cell + 24u));
+        if (sample.adc[cell] > 3300u) { hot_cells += 2u; sample.fault++; }
+        else if (sample.adc[cell] > 2600u) hot_cells++;
+    }
+    sample.value = (float)hot_cells * 0.05f;
+    star_can_publish(UINT32_C(0x410), &sample.value, sizeof(sample.value));
 }
 
-static void rts_automotive_can_step(void)
+static void StarTask_100ms_PowertrainManager(void *context)
 {
-    uint32_t value = g_can_payload;
-    uint32_t index;
-    for (index = 0u; index < 80u; ++index)
-        value = (value >> 1u) ^ (value << 7u) ^ UINT32_C(0x1edc6f41);
-    g_can_payload = value;
+    StarAutomotiveSample sample = {0};
+    uint32_t torque = 0u;
+    uint8_t sensor;
+    (void)context;
+    for (sensor = 0u; sensor < 7u; ++sensor)
+    {
+        sample.adc[sensor] = star_adc_read((uint8_t)(sensor + 32u));
+        torque += sample.adc[sensor] / (uint32_t)(sensor + 1u);
+        if (sample.adc[sensor] > 3600u) sample.fault++;
+    }
+    sample.value = (float)torque * 0.01f;
+    star_can_publish(UINT32_C(0x510), &sample.value, sizeof(sample.value));
 }
 
-static void rts_automotive_thermal_step(void)
+static void StarTask_200ms_Diagnostics(void *context)
 {
-    uint32_t value = g_thermal_state;
-    uint32_t index;
-    for (index = 0u; index < 40u; ++index)
-        value += (value ^ (index * UINT32_C(0x9e37))) >> 1u;
-    g_thermal_state = value;
+    StarAutomotiveSample sample = {0};
+    uint32_t dtc_mask = 0u;
+    uint8_t module;
+    (void)context;
+    for (module = 0u; module < 8u; ++module)
+    {
+        sample.adc[module] = star_adc_read((uint8_t)(module + 40u));
+        if (sample.adc[module] > 3400u || sample.adc[module] < 100u)
+            dtc_mask |= UINT32_C(1) << module;
+    }
+    sample.state = (dtc_mask == 0u) ? 0u : 1u;
+    star_can_publish(UINT32_C(0x620), &dtc_mask, sizeof(dtc_mask));
 }
 
-static void rts_automotive_logging_step(void)
+static void StarTask_500ms_NetworkGateway(void *context)
 {
-    uint32_t value = g_log_checksum;
-    uint32_t index;
-    for (index = 0u; index < 12u; ++index)
-        value = (value << 5u) - value + index + UINT32_C(0x1001);
-    g_log_checksum = value;
+    StarAutomotiveSample sample = {0};
+    uint8_t bus;
+    uint32_t score = 0u;
+    (void)context;
+    for (bus = 0u; bus < 6u; ++bus) score += star_adc_read((uint8_t)(bus + 48u)) > 1500u ? 3u : 1u;
+    sample.can_id = (score > 12u) ? UINT32_C(0x712) : UINT32_C(0x710);
+    star_can_publish(sample.can_id, &score, sizeof(score));
+}
+
+static void StarTask_1000ms_VehicleHealth(void *context)
+{
+    StarAutomotiveSample sample = {0};
+    uint32_t aging = 0u;
+    uint8_t index;
+    (void)context;
+    for (index = 0u; index < 8u; ++index) aging += star_adc_read((uint8_t)(index + 56u));
+    sample.value = (float)aging * 0.0001f;
+    sample.state = (sample.value > 0.8f) ? 3u : ((sample.value > 0.5f) ? 2u : 0u);
+    star_can_publish(UINT32_C(0x810), &sample.value, sizeof(sample.value));
 }
 
 static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
@@ -357,35 +439,35 @@ static void rts_automotive_step_measure(const rts_smoke_task_argument_t *task)
 
     if (task == &g_task_a_argument)
     {
-        rts_automotive_control_step();
+        StarTask_5ms_BrakeControl(NULL);
     }
     else if (task == &g_task_b_argument)
     {
-        rts_automotive_diagnostic_step();
+        StarTask_10ms_SteeringAssist(NULL);
     }
     else if (task == &g_task_c_argument)
     {
-        rts_automotive_sensor_step();
+        StarTask_25ms_CrashSafety(NULL);
     }
     else if (task == &g_task_d_argument)
     {
-        rts_automotive_brake_step();
+        StarTask_50ms_BatteryThermal(NULL);
     }
     else if (task == &g_task_e_argument)
     {
-        rts_automotive_steering_step();
+        StarTask_100ms_PowertrainManager(NULL);
     }
     else if (task == &g_task_f_argument)
     {
-        rts_automotive_can_step();
+        StarTask_200ms_Diagnostics(NULL);
     }
     else if (task == &g_task_g_argument)
     {
-        rts_automotive_thermal_step();
+        StarTask_500ms_NetworkGateway(NULL);
     }
     else
     {
-        rts_automotive_logging_step();
+        StarTask_1000ms_VehicleHealth(NULL);
     }
 
     elapsed = rts_s32k148_cycle_now() - start;
@@ -750,8 +832,8 @@ int main(void)
         .stack_buffer = g_task_a_stack,
         .stack_size_bytes = sizeof(g_task_a_stack),
         .priority = 3u,
-        .period = 20u,
-        .relative_deadline = 20u,
+        .period = 5u,
+        .relative_deadline = 5u,
         .execution_budget = 0u
     };
     const rts_task_config_t config_b = {
@@ -760,8 +842,8 @@ int main(void)
         .stack_buffer = g_task_b_stack,
         .stack_size_bytes = sizeof(g_task_b_stack),
         .priority = 1u,
-        .period = 40u,
-        .relative_deadline = 40u,
+        .period = 10u,
+        .relative_deadline = 10u,
         .execution_budget = 0u
     };
     const rts_task_config_t config_c = {
@@ -770,15 +852,15 @@ int main(void)
         .stack_buffer = g_task_c_stack,
         .stack_size_bytes = sizeof(g_task_c_stack),
         .priority = 2u,
-        .period = 30u,
-        .relative_deadline = 30u,
+        .period = 25u,
+        .relative_deadline = 25u,
         .execution_budget = 0u
     };
     const rts_task_config_t config_d = { .entry = rts_smoke_task, .argument = &g_task_d_argument, .stack_buffer = g_task_d_stack, .stack_size_bytes = sizeof(g_task_d_stack), .priority = 4u, .period = 50u, .relative_deadline = 50u, .execution_budget = 0u };
-    const rts_task_config_t config_e = { .entry = rts_smoke_task, .argument = &g_task_e_argument, .stack_buffer = g_task_e_stack, .stack_size_bytes = sizeof(g_task_e_stack), .priority = 5u, .period = 60u, .relative_deadline = 60u, .execution_budget = 0u };
-    const rts_task_config_t config_f = { .entry = rts_smoke_task, .argument = &g_task_f_argument, .stack_buffer = g_task_f_stack, .stack_size_bytes = sizeof(g_task_f_stack), .priority = 6u, .period = 70u, .relative_deadline = 70u, .execution_budget = 0u };
-    const rts_task_config_t config_g = { .entry = rts_smoke_task, .argument = &g_task_g_argument, .stack_buffer = g_task_g_stack, .stack_size_bytes = sizeof(g_task_g_stack), .priority = 7u, .period = 80u, .relative_deadline = 80u, .execution_budget = 0u };
-    const rts_task_config_t config_h = { .entry = rts_smoke_task, .argument = &g_task_h_argument, .stack_buffer = g_task_h_stack, .stack_size_bytes = sizeof(g_task_h_stack), .priority = 8u, .period = 90u, .relative_deadline = 90u, .execution_budget = 0u };
+    const rts_task_config_t config_e = { .entry = rts_smoke_task, .argument = &g_task_e_argument, .stack_buffer = g_task_e_stack, .stack_size_bytes = sizeof(g_task_e_stack), .priority = 5u, .period = 100u, .relative_deadline = 100u, .execution_budget = 0u };
+    const rts_task_config_t config_f = { .entry = rts_smoke_task, .argument = &g_task_f_argument, .stack_buffer = g_task_f_stack, .stack_size_bytes = sizeof(g_task_f_stack), .priority = 6u, .period = 200u, .relative_deadline = 200u, .execution_budget = 0u };
+    const rts_task_config_t config_g = { .entry = rts_smoke_task, .argument = &g_task_g_argument, .stack_buffer = g_task_g_stack, .stack_size_bytes = sizeof(g_task_g_stack), .priority = 7u, .period = 500u, .relative_deadline = 500u, .execution_budget = 0u };
+    const rts_task_config_t config_h = { .entry = rts_smoke_task, .argument = &g_task_h_argument, .stack_buffer = g_task_h_stack, .stack_size_bytes = sizeof(g_task_h_stack), .priority = 8u, .period = 1000u, .relative_deadline = 1000u, .execution_budget = 0u };
     const rts_timer_config_t periodic_timer_config = {
         .period = 25u,
         .callback = rts_smoke_periodic_timer_callback,
