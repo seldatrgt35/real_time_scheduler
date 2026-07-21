@@ -66,6 +66,9 @@ RTS_TASK_STACK_DECLARE(g_task_g_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 RTS_TASK_STACK_DECLARE(g_task_h_stack, RTS_SMOKE_STACK_SIZE_BYTES);
 
 rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
+volatile rts_smoke_trace_entry_t
+    g_rts_s32k148_trace_log[RTS_SMOKE_TRACE_CAPACITY];
+volatile uint32_t g_rts_s32k148_trace_sequence;
 static rts_semaphore_t g_smoke_semaphore;
 static rts_semaphore_t g_timer_semaphore;
 static rts_mutex_t g_smoke_mutex;
@@ -74,16 +77,35 @@ static rts_tick_t g_low_mutex_lock_tick;
 static rts_timer_handle_t g_periodic_timer;
 static rts_timer_handle_t g_one_shot_timer;
 
+static void rts_smoke_trace_emit(rts_smoke_trace_kind_t kind,
+                                 uint32_t task_identifier,
+                                 uint32_t argument)
+{
+    uint32_t sequence = g_rts_s32k148_trace_sequence;
+    uint32_t index = sequence % RTS_SMOKE_TRACE_CAPACITY;
+    volatile rts_smoke_trace_entry_t *entry =
+        &g_rts_s32k148_trace_log[index];
+
+    entry->tick = rts_kernel_tick_now();
+    entry->cycle = rts_s32k148_cycle_now();
+    entry->task_identifier = task_identifier;
+    entry->argument = argument;
+    entry->kind = kind;
+    entry->sequence = sequence + 1u;
+    g_rts_s32k148_trace_sequence = sequence + 1u;
+}
+
 void rts_power_before_sleep(rts_tick_t planned_ticks)
 {
-    (void)planned_ticks;
+    rts_smoke_trace_emit(RTS_SMOKE_TRACE_IDLE_ENTER, 0u, planned_ticks);
     ++g_rts_s32k148_smoke_record.tickless_before_sleep_count;
 }
 
 void rts_power_after_sleep(rts_tick_t elapsed_ticks,
                            rts_port_wake_source_t source)
 {
-    (void)source;
+    rts_smoke_trace_emit(RTS_SMOKE_TRACE_IDLE_EXIT, 0u,
+                         (uint32_t)source);
     ++g_rts_s32k148_smoke_record.tickless_after_sleep_count;
     g_rts_s32k148_smoke_record.tickless_elapsed_ticks += elapsed_ticks;
 }
@@ -578,7 +600,26 @@ static void rts_smoke_task(void *argument)
 
     for (;;)
     {
+        rts_smoke_trace_emit(RTS_SMOKE_TRACE_WORK_BEGIN,
+                             task->identifier, 0u);
         rts_automotive_step_measure(task);
+        rts_smoke_trace_emit(
+            RTS_SMOKE_TRACE_WORK_END, task->identifier,
+            task == &g_task_a_argument
+                ? g_rts_s32k148_smoke_record.task_a_last_execution_us
+                : task == &g_task_b_argument
+                      ? g_rts_s32k148_smoke_record.task_b_last_execution_us
+                      : task == &g_task_c_argument
+                            ? g_rts_s32k148_smoke_record.task_c_last_execution_us
+                            : task == &g_task_d_argument
+                                  ? g_rts_s32k148_smoke_record.task_d_last_execution_us
+                                  : task == &g_task_e_argument
+                                        ? g_rts_s32k148_smoke_record.task_e_last_execution_us
+                                        : task == &g_task_f_argument
+                                              ? g_rts_s32k148_smoke_record.task_f_last_execution_us
+                                              : task == &g_task_g_argument
+                                                    ? g_rts_s32k148_smoke_record.task_g_last_execution_us
+                                                    : g_rts_s32k148_smoke_record.task_h_last_execution_us);
 
         /* Visible hardware heartbeat from Task A.  The divider keeps the
          * active-low red LED slow enough to observe on the EVB. */
@@ -797,11 +838,21 @@ static void rts_smoke_task(void *argument)
             }
             ++g_rts_s32k148_smoke_record.task_a_wakeup_count;
         }
-        else if (rts_task_delay(task->work_delay_ticks) !=
-                 RTS_STATUS_OK)
+        else
         {
-            g_rts_s32k148_smoke_record.failure_flags |=
-                RTS_SMOKE_FAILURE_YIELD;
+            rts_smoke_trace_emit(RTS_SMOKE_TRACE_BLOCK,
+                                 task->identifier,
+                                 task->work_delay_ticks);
+            if (rts_task_delay(task->work_delay_ticks) != RTS_STATUS_OK)
+            {
+                g_rts_s32k148_smoke_record.failure_flags |=
+                    RTS_SMOKE_FAILURE_YIELD;
+            }
+            else
+            {
+                rts_smoke_trace_emit(RTS_SMOKE_TRACE_READY,
+                                     task->identifier, 0u);
+            }
         }
     }
 }

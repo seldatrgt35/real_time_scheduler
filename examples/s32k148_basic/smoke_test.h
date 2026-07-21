@@ -5,6 +5,28 @@
 
 #include "rts/rts_types.h"
 
+#define RTS_SMOKE_TRACE_CAPACITY 128u
+
+typedef enum
+{
+    RTS_SMOKE_TRACE_WORK_BEGIN = 1,
+    RTS_SMOKE_TRACE_WORK_END,
+    RTS_SMOKE_TRACE_BLOCK,
+    RTS_SMOKE_TRACE_READY,
+    RTS_SMOKE_TRACE_IDLE_ENTER,
+    RTS_SMOKE_TRACE_IDLE_EXIT
+} rts_smoke_trace_kind_t;
+
+typedef struct
+{
+    volatile uint32_t sequence;
+    volatile rts_tick_t tick;
+    volatile uint32_t cycle;
+    volatile uint32_t task_identifier;
+    volatile uint32_t argument;
+    volatile rts_smoke_trace_kind_t kind;
+} rts_smoke_trace_entry_t;
+
 enum
 {
     RTS_SMOKE_FAILURE_INIT = UINT32_C(1) << 0,
@@ -122,6 +144,9 @@ typedef struct
 } rts_s32k148_smoke_record_t;
 
 extern rts_s32k148_smoke_record_t g_rts_s32k148_smoke_record;
+extern volatile rts_smoke_trace_entry_t
+    g_rts_s32k148_trace_log[RTS_SMOKE_TRACE_CAPACITY];
+extern volatile uint32_t g_rts_s32k148_trace_sequence;
 
 uint32_t rts_smoke_verify_registers(const uint32_t *patterns);
 
