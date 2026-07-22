@@ -21,6 +21,7 @@
 #include "scheduler_internal.h"
 #include "power_internal.h"
 
+
 #define RTS_SMOKE_STACK_SIZE_BYTES 1024u
 #define RTS_SMOKE_GUARD_SIZE_BYTES RTS_STACK_GUARD_SIZE_BYTES
 #define RTS_SMOKE_GUARD_VALUE      UINT8_C(0xa5)
@@ -307,6 +308,84 @@ static void star_can_publish(uint32_t id, const void *payload, size_t length)
         g_star_benchmark_sink = (g_star_benchmark_sink << 3u) ^ bytes[index];
 }
 
+static uint32_t star_sensor_window(
+    StarAutomotiveSample *sample,
+    uint8_t base_channel,
+    uint8_t limit)
+{
+    uint32_t score = 0u;
+    uint8_t index;
+    for (index = 0u; index < limit; ++index)
+    {
+        uint16_t raw = star_adc_read((uint8_t)(base_channel + index));
+        sample->adc[index & 0x07u] = raw;
+        score += raw * (uint32_t)(index + 1u);
+        if (raw > 3600u) sample->fault += 2u;
+        else if (raw > 2400u) sample->confidence += 0.20f;
+        else if (raw < 200u) sample->fault++;
+        else sample->confidence += 0.05f;
+    }
+    return score;
+}
+
+static float star_state_machine_score(
+    StarAutomotiveSample *sample,
+    uint32_t score)
+{
+    float value = (float)(score & 0x0fffu) * 0.001f;
+    uint8_t step;
+    for (step = 0u; step < 4u; ++step)
+    {
+        switch ((score >> (step * 2u)) & 0x03u)
+        {
+        case 0u:
+            value += 0.20f;
+            break;
+        case 1u:
+            value += 0.75f;
+            sample->state = 1u;
+            break;
+        case 2u:
+            value -= 0.35f;
+            sample->state = 2u;
+            break;
+        default:
+            value += 1.10f;
+            sample->fault++;
+            sample->state = 3u;
+            break;
+        }
+    }
+    if (value > 5.0f) rts_s32k148_red_led_set(true);
+    else if (sample->fault > 2u) rts_s32k148_red_led_set(false);
+    return value;
+}
+
+static void star_publish_state(
+    StarAutomotiveSample *sample,
+    uint32_t base_id,
+    uint8_t repetitions)
+{
+    uint8_t index;
+    for (index = 0u; index < repetitions; ++index)
+    {
+        if (sample->state >= 3u)
+        {
+            star_can_publish(base_id + index, sample, sizeof(*sample));
+        }
+        else if (sample->fault > index)
+        {
+            star_can_publish(base_id + 0x10u + index,
+                             &sample->fault,
+                             sizeof(sample->fault));
+        }
+        else
+        {
+            g_star_benchmark_sink += base_id + index + sample->state;
+        }
+    }
+}
+
 static uint32_t brake_sample_inputs(StarAutomotiveSample *sample)
 {
     uint32_t checksum = 0u;
@@ -361,6 +440,7 @@ static void StarTask_10ms_SteeringAssist(void *context)
         effort += (sample.adc[index] > 3000u) ? 9u : ((sample.adc[index] < 300u) ? 11u : 3u);
     }
     sample.value = (float)effort * 0.125f;
+    sample.value += star_state_machine_score(&sample, effort);
     rts_s32k148_red_led_set(sample.value > 12.0f);
     star_can_publish(UINT32_C(0x220), &sample.value, sizeof(sample.value));
 }
@@ -378,8 +458,13 @@ static void StarTask_25ms_CrashSafety(void *context)
         if (sample.adc[axis] > 3500u) sample.fault += 3u;
     }
     sample.state = (energy > 9000000u || sample.fault > 2u) ? 3u : 0u;
+    energy += star_sensor_window(&sample, 64u, 4u);
+    energy += star_sensor_window(&sample, 68u, 6u);
+    sample.value = star_state_machine_score(&sample, energy);
+    sample.value += star_state_machine_score(&sample, energy >> 1u);
     rts_s32k148_red_led_set(sample.state >= 3u);
     if (sample.state >= 3u) star_can_publish(UINT32_C(0x300), &sample, sizeof(sample));
+    star_publish_state(&sample, UINT32_C(0x301), 2u);
 }
 
 static void StarTask_50ms_BatteryThermal(void *context)
@@ -394,8 +479,14 @@ static void StarTask_50ms_BatteryThermal(void *context)
         if (sample.adc[cell] > 3300u) { hot_cells += 2u; sample.fault++; }
         else if (sample.adc[cell] > 2600u) hot_cells++;
     }
+    hot_cells += star_sensor_window(&sample, 72u, 6u);
+    hot_cells += star_sensor_window(&sample, 80u, 3u);
+    hot_cells += star_sensor_window(&sample, 84u, 8u);
     sample.value = (float)hot_cells * 0.05f;
+    sample.value += star_state_machine_score(&sample, hot_cells);
+    sample.value += star_state_machine_score(&sample, hot_cells >> 1u);
     star_can_publish(UINT32_C(0x410), &sample.value, sizeof(sample.value));
+    star_publish_state(&sample, UINT32_C(0x411), 3u);
 }
 
 static void StarTask_100ms_PowertrainManager(void *context)
@@ -410,8 +501,15 @@ static void StarTask_100ms_PowertrainManager(void *context)
         torque += sample.adc[sensor] / (uint32_t)(sensor + 1u);
         if (sample.adc[sensor] > 3600u) sample.fault++;
     }
+    torque += star_sensor_window(&sample, 88u, 6u);
+    torque += star_sensor_window(&sample, 96u, 6u);
+    torque += star_sensor_window(&sample, 100u, 8u);
     sample.value = (float)torque * 0.01f;
+    sample.value += star_state_machine_score(&sample, torque);
+    sample.value += star_state_machine_score(&sample, torque >> 1u);
+    sample.value += star_state_machine_score(&sample, torque >> 2u);
     star_can_publish(UINT32_C(0x510), &sample.value, sizeof(sample.value));
+    star_publish_state(&sample, UINT32_C(0x511), 4u);
 }
 
 static void StarTask_200ms_Diagnostics(void *context)
@@ -426,8 +524,13 @@ static void StarTask_200ms_Diagnostics(void *context)
         if (sample.adc[module] > 3400u || sample.adc[module] < 100u)
             dtc_mask |= UINT32_C(1) << module;
     }
+    dtc_mask ^= star_sensor_window(&sample, 104u, 5u);
+    dtc_mask ^= star_sensor_window(&sample, 108u, 7u);
     sample.state = (dtc_mask == 0u) ? 0u : 1u;
+    sample.value = star_state_machine_score(&sample, dtc_mask);
+    sample.value += star_state_machine_score(&sample, dtc_mask >> 1u);
     star_can_publish(UINT32_C(0x620), &dtc_mask, sizeof(dtc_mask));
+    star_publish_state(&sample, UINT32_C(0x621), 2u);
 }
 
 static void StarTask_500ms_NetworkGateway(void *context)
@@ -437,6 +540,7 @@ static void StarTask_500ms_NetworkGateway(void *context)
     uint32_t score = 0u;
     (void)context;
     for (bus = 0u; bus < 6u; ++bus) score += star_adc_read((uint8_t)(bus + 48u)) > 1500u ? 3u : 1u;
+    score += star_sensor_window(&sample, 112u, 2u);
     sample.can_id = (score > 12u) ? UINT32_C(0x712) : UINT32_C(0x710);
     star_can_publish(sample.can_id, &score, sizeof(score));
 }
@@ -448,9 +552,18 @@ static void StarTask_1000ms_VehicleHealth(void *context)
     uint8_t index;
     (void)context;
     for (index = 0u; index < 8u; ++index) aging += star_adc_read((uint8_t)(index + 56u));
+    aging += star_sensor_window(&sample, 120u, 8u);
+    aging += star_sensor_window(&sample, 128u, 8u);
+    aging += star_sensor_window(&sample, 136u, 4u);
+    aging += star_sensor_window(&sample, 140u, 8u);
+    aging += star_sensor_window(&sample, 148u, 6u);
     sample.value = (float)aging * 0.0001f;
+    sample.value += star_state_machine_score(&sample, aging);
+    sample.value += star_state_machine_score(&sample, aging >> 1u);
+    sample.value += star_state_machine_score(&sample, aging >> 2u);
     sample.state = (sample.value > 0.8f) ? 3u : ((sample.value > 0.5f) ? 2u : 0u);
     star_can_publish(UINT32_C(0x810), &sample.value, sizeof(sample.value));
+    star_publish_state(&sample, UINT32_C(0x811), 5u);
 }
 
 typedef void (*rts_automotive_work_fn_t)(void *context);
