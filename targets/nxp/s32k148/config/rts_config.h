@@ -1,13 +1,13 @@
 #ifndef RTS_CONFIG_H
 #define RTS_CONFIG_H
 
-#define RTS_MAX_TASKS                 8u
+#define RTS_MAX_TASKS                 10u
 #define RTS_CPU_COUNT                 1u
 #define RTS_MAX_TIMERS                8u
-#define RTS_TIMER_SERVICE_PRIORITY    6u
+#define RTS_TIMER_SERVICE_PRIORITY    11u
 #define RTS_TIMER_SERVICE_STACK_SIZE_BYTES 768u
 #define RTS_TIMER_CALLBACK_QUEUE_CAPACITY RTS_MAX_TIMERS
-#define RTS_PRIORITY_COUNT            8u
+#define RTS_PRIORITY_COUNT            12u
 #define RTS_TICK_RATE_HZ              1000u
 #define RTS_ENABLE_TICKLESS_IDLE      1
 #define RTS_TICKLESS_MAX_SLEEP_TICKS  60000u
