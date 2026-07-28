@@ -982,7 +982,7 @@ int main(void)
         .argument = &g_task_a_argument,
         .stack_buffer = g_task_a_stack,
         .stack_size_bytes = sizeof(g_task_a_stack),
-        .priority = 5u,
+        .priority = 3u,
         .period = 5u,
         .relative_deadline = 5u,
         .execution_budget = 0u
@@ -992,7 +992,7 @@ int main(void)
         .argument = &g_task_b_argument,
         .stack_buffer = g_task_b_stack,
         .stack_size_bytes = sizeof(g_task_b_stack),
-        .priority = 5u,
+        .priority = 3u,
         .period = 10u,
         .relative_deadline = 10u,
         .execution_budget = 0u
@@ -1002,15 +1002,15 @@ int main(void)
         .argument = &g_task_c_argument,
         .stack_buffer = g_task_c_stack,
         .stack_size_bytes = sizeof(g_task_c_stack),
-        .priority = 4u,
+        .priority = 3u,
         .period = 25u,
         .relative_deadline = 25u,
         .execution_budget = 0u
     };
-    const rts_task_config_t config_d = { .entry = rts_smoke_task, .argument = &g_task_d_argument, .stack_buffer = g_task_d_stack, .stack_size_bytes = sizeof(g_task_d_stack), .priority = 4u, .period = 50u, .relative_deadline = 50u, .execution_budget = 0u };
-    const rts_task_config_t config_e = { .entry = rts_smoke_task, .argument = &g_task_e_argument, .stack_buffer = g_task_e_stack, .stack_size_bytes = sizeof(g_task_e_stack), .priority = 3u, .period = 100u, .relative_deadline = 100u, .execution_budget = 0u };
-    const rts_task_config_t config_f = { .entry = rts_smoke_task, .argument = &g_task_f_argument, .stack_buffer = g_task_f_stack, .stack_size_bytes = sizeof(g_task_f_stack), .priority = 3u, .period = 200u, .relative_deadline = 200u, .execution_budget = 0u };
-    const rts_task_config_t config_g = { .entry = rts_smoke_task, .argument = &g_task_g_argument, .stack_buffer = g_task_g_stack, .stack_size_bytes = sizeof(g_task_g_stack), .priority = 2u, .period = 500u, .relative_deadline = 500u, .execution_budget = 0u };
+    const rts_task_config_t config_d = { .entry = rts_smoke_task, .argument = &g_task_d_argument, .stack_buffer = g_task_d_stack, .stack_size_bytes = sizeof(g_task_d_stack), .priority = 2u, .period = 50u, .relative_deadline = 50u, .execution_budget = 0u };
+    const rts_task_config_t config_e = { .entry = rts_smoke_task, .argument = &g_task_e_argument, .stack_buffer = g_task_e_stack, .stack_size_bytes = sizeof(g_task_e_stack), .priority = 2u, .period = 100u, .relative_deadline = 100u, .execution_budget = 0u };
+    const rts_task_config_t config_f = { .entry = rts_smoke_task, .argument = &g_task_f_argument, .stack_buffer = g_task_f_stack, .stack_size_bytes = sizeof(g_task_f_stack), .priority = 2u, .period = 200u, .relative_deadline = 200u, .execution_budget = 0u };
+    const rts_task_config_t config_g = { .entry = rts_smoke_task, .argument = &g_task_g_argument, .stack_buffer = g_task_g_stack, .stack_size_bytes = sizeof(g_task_g_stack), .priority = 1u, .period = 500u, .relative_deadline = 500u, .execution_budget = 0u };
     const rts_task_config_t config_h = { .entry = rts_smoke_task, .argument = &g_task_h_argument, .stack_buffer = g_task_h_stack, .stack_size_bytes = sizeof(g_task_h_stack), .priority = 1u, .period = 1000u, .relative_deadline = 1000u, .execution_budget = 0u };
     const rts_timer_config_t periodic_timer_config = {
         .period = 25u,
