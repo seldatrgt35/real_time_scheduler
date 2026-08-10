@@ -1981,4 +1981,17 @@ if(DEFINED STAR_BENCHMARK_ROOT)
     target_link_libraries(star_s32k148_automotive_standard PRIVATE rts_target_s32k148 rts_cortex_m4f_port gcc)
     target_link_options(star_s32k148_automotive_standard PRIVATE -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib -Wl,--gc-sections -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_automotive_standard>/star_s32k148_automotive_standard.map -T${RTS_S32K148_LINKER_SCRIPT})
     add_custom_target(star_target_s32k148_automotive_standard DEPENDS star_s32k148_automotive_standard)
+
+    add_executable(star_s32k148_automotive_holdout
+        ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+        "${STAR_BENCHMARK_ROOT}/calibration/automotive_holdout_task.c"
+        "${STAR_BENCHMARK_ROOT}/board/integration/s32k148_automotive_holdout_main.c"
+        startup/startup_s32k148.S)
+    set_target_properties(star_s32k148_automotive_holdout PROPERTIES OUTPUT_NAME star_s32k148_automotive_holdout SUFFIX .elf)
+    target_include_directories(star_s32k148_automotive_holdout PRIVATE ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR} ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f ${CMAKE_CURRENT_SOURCE_DIR} "${STAR_BENCHMARK_ROOT}/calibration" "${STAR_BENCHMARK_ROOT}/tasks/include" "${STAR_BENCHMARK_ROOT}/board/include")
+    target_compile_definitions(star_s32k148_automotive_holdout PRIVATE BENCHMARK_PLATFORM_CORTEX_M_DWT BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h" RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS} RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY} RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_automotive_holdout PRIVATE -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wpedantic -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_automotive_holdout PRIVATE rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_automotive_holdout PRIVATE -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib -Wl,--gc-sections -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_automotive_holdout>/star_s32k148_automotive_holdout.map -T${RTS_S32K148_LINKER_SCRIPT})
+    add_custom_target(star_target_s32k148_automotive_holdout DEPENDS star_s32k148_automotive_holdout)
 endif()
