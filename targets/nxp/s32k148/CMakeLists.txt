@@ -2,6 +2,120 @@ if(NOT CMAKE_CROSSCOMPILING)
     message(FATAL_ERROR
         "RTS_BUILD_S32K148_SMOKE requires an ARM bare-metal toolchain file")
 endif()
+
+# Real FlexCAN ISR-to-task calibration. SDK sources stay external to this repo.
+function(rts_add_flexcan_isr_target)
+set(RTS_S32K148_SDK_ROOT "C:/NXP/S32_SDK_S32K1xx_RTM_4.0.2" CACHE PATH
+    "NXP S32 SDK root used by the FlexCAN ISR latency calibration")
+set(RTS_S32K148_SDK_FLEXCAN_BOARD
+    "${RTS_S32K148_SDK_ROOT}/examples/S32K148/demo_apps/flexcan_encrypted/board")
+if(EXISTS "${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_driver.c")
+    add_executable(star_s32k148_flexcan_isr_latency
+        ${RTS_S32K148_KERNEL_SOURCES}
+        ${PROJECT_SOURCE_DIR}/examples/s32k148_flexcan_isr_latency/main.c
+        ${PROJECT_SOURCE_DIR}/examples/s32k148_flexcan_isr_latency/osif_flexcan_stub.c
+        ${RTS_S32K148_SDK_FLEXCAN_BOARD}/clock_config.c
+        ${RTS_S32K148_SDK_FLEXCAN_BOARD}/peripherals_flexcan_config_1.c
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/startup.c
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/system_S32K148.c
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/gcc/startup_S32K148.S
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx/clock_S32K1xx.c
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/interrupt/interrupt_manager.c
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_driver.c
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_hw_access.c
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_driver.c
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_hw_access.c)
+    set_target_properties(star_s32k148_flexcan_isr_latency PROPERTIES
+        OUTPUT_NAME star_s32k148_flexcan_isr_latency SUFFIX .elf)
+    target_include_directories(star_s32k148_flexcan_isr_latency PRIVATE
+        ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+        ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/kernel
+        ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RTS_S32K148_SDK_FLEXCAN_BOARD}
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/include
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148
+        ${RTS_S32K148_SDK_ROOT}/platform/devices/common
+        ${RTS_S32K148_SDK_ROOT}/platform/devices
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/inc
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma
+        ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx
+        ${RTS_S32K148_SDK_ROOT}/rtos/osif)
+    target_compile_definitions(star_s32k148_flexcan_isr_latency PRIVATE
+        CPU_S32K148 DEV_ERROR_DETECT
+        RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+        RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+        RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_flexcan_isr_latency PRIVATE
+        -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding -fno-builtin
+        -fno-unwind-tables -fno-asynchronous-unwind-tables -ffunction-sections
+        -fdata-sections -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_flexcan_isr_latency PRIVATE
+        rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_flexcan_isr_latency PRIVATE
+        -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -Wl,--gc-sections
+        -Wl,--defsym,g_pfnVectors=__VECTOR_RAM
+        -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_flexcan_isr_latency>/star_s32k148_flexcan_isr_latency.map
+        -T${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/linker/gcc/S32K148_256_flash.ld
+        -specs=nano.specs -specs=nosys.specs)
+    add_custom_target(star_target_s32k148_flexcan_isr_latency
+        DEPENDS star_s32k148_flexcan_isr_latency)
+
+    set(STAR_TASK_CONTROLLER_ROOT
+        "C:/Users/nxg19748/OneDrive - NXP/Desktop/real_time_scheduler_task_controller"
+        CACHE PATH "STAR task-controller repository used by the full-stack demo")
+    set(STAR_FULL_STACK_SOURCE
+        "${STAR_TASK_CONTROLLER_ROOT}/task_admission_framework/examples/powertrain_full_stack_demo.c")
+    if(EXISTS "${STAR_FULL_STACK_SOURCE}")
+        add_executable(star_s32k148_powertrain_full_stack_demo
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_powertrain_full_stack_demo/main.c
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_flexcan_isr_latency/osif_flexcan_stub.c
+            ${STAR_FULL_STACK_SOURCE}
+            ${RTS_S32K148_SDK_FLEXCAN_BOARD}/clock_config.c
+            ${RTS_S32K148_SDK_FLEXCAN_BOARD}/peripherals_flexcan_config_1.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/startup.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/system_S32K148.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/gcc/startup_S32K148.S
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx/clock_S32K1xx.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/interrupt/interrupt_manager.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_driver.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_hw_access.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_driver.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_hw_access.c)
+        set_target_properties(star_s32k148_powertrain_full_stack_demo PROPERTIES
+            OUTPUT_NAME star_s32k148_powertrain_full_stack_demo SUFFIX .elf)
+        target_include_directories(star_s32k148_powertrain_full_stack_demo PRIVATE
+            ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/kernel
+            ${CMAKE_CURRENT_SOURCE_DIR} ${RTS_S32K148_SDK_FLEXCAN_BOARD}
+            ${STAR_TASK_CONTROLLER_ROOT}/task_admission_framework/examples
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/include
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/common
+            ${RTS_S32K148_SDK_ROOT}/platform/devices
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/inc
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx
+            ${RTS_S32K148_SDK_ROOT}/rtos/osif)
+        target_compile_definitions(star_s32k148_powertrain_full_stack_demo PRIVATE
+            CPU_S32K148 DEV_ERROR_DETECT)
+        target_compile_options(star_s32k148_powertrain_full_stack_demo PRIVATE
+            -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+            -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+            -ffunction-sections -fdata-sections -mgeneral-regs-only)
+        target_link_libraries(star_s32k148_powertrain_full_stack_demo PRIVATE gcc)
+        target_link_options(star_s32k148_powertrain_full_stack_demo PRIVATE
+            -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -Wl,--gc-sections
+            -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_powertrain_full_stack_demo>/star_s32k148_powertrain_full_stack_demo.map
+            -T${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/linker/gcc/S32K148_256_flash.ld
+            -specs=nano.specs -specs=nosys.specs)
+        add_custom_target(star_target_s32k148_powertrain_full_stack_demo
+            DEPENDS star_s32k148_powertrain_full_stack_demo)
+    endif()
+endif()
+endfunction()
+
 if(NOT DEFINED RTS_S32K148_DEVICE_INCLUDE_DIR)
     message(FATAL_ERROR
         "RTS_S32K148_DEVICE_INCLUDE_DIR must contain NXP S32K148.h")
@@ -2098,4 +2212,46 @@ if(DEFINED STAR_BENCHMARK_ROOT)
     target_link_libraries(star_s32k148_powertrain_ref PRIVATE rts_target_s32k148 rts_cortex_m4f_port gcc)
     target_link_options(star_s32k148_powertrain_ref PRIVATE -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib -Wl,--gc-sections -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_powertrain_ref>/star_s32k148_powertrain_reference.map -T${RTS_S32K148_LINKER_SCRIPT})
     add_custom_target(star_target_s32k148_powertrain_ref DEPENDS star_s32k148_powertrain_ref)
+
+    set(STAR_COMPOUND_CALIBRATION_SOURCE
+        "C:/Users/nxg19748/OneDrive - NXP/Desktop/real_time_scheduler_task_controller/task_admission_framework/examples/powertrain_compound_calibration.c")
+    if(EXISTS "${STAR_COMPOUND_CALIBRATION_SOURCE}")
+        add_executable(star_s32k148_powertrain_compound_calibration
+            ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+            "${STAR_COMPOUND_CALIBRATION_SOURCE}"
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_powertrain_compound_calibration/main.c
+            startup/startup_s32k148.S)
+        set_target_properties(star_s32k148_powertrain_compound_calibration PROPERTIES
+            OUTPUT_NAME star_s32k148_powertrain_compound_calibration SUFFIX .elf)
+        target_include_directories(star_s32k148_powertrain_compound_calibration PRIVATE
+            ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+            ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include
+            ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            "C:/Users/nxg19748/OneDrive - NXP/Desktop/real_time_scheduler_task_controller/task_admission_framework/examples"
+            "${STAR_BENCHMARK_ROOT}/board/include"
+            "${STAR_BENCHMARK_ROOT}/tasks/include")
+        target_compile_definitions(star_s32k148_powertrain_compound_calibration PRIVATE
+            BENCHMARK_PLATFORM_CORTEX_M_DWT
+            BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h"
+            RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+            RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+            RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+        target_compile_options(star_s32k148_powertrain_compound_calibration PRIVATE
+            -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+            -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+            -ffunction-sections -fdata-sections -Wall -Wextra -Werror
+            -Wpedantic -mgeneral-regs-only)
+        target_link_libraries(star_s32k148_powertrain_compound_calibration PRIVATE
+            rts_target_s32k148 rts_cortex_m4f_port gcc)
+        target_link_options(star_s32k148_powertrain_compound_calibration PRIVATE
+            -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib
+            -Wl,--gc-sections
+            -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_powertrain_compound_calibration>/star_s32k148_powertrain_compound_calibration.map
+            -T${RTS_S32K148_LINKER_SCRIPT})
+        add_custom_target(star_target_s32k148_powertrain_compound_calibration
+            DEPENDS star_s32k148_powertrain_compound_calibration)
+    endif()
 endif()
+
+rts_add_flexcan_isr_target()
