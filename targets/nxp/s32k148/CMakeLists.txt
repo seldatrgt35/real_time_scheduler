@@ -112,6 +112,57 @@ if(EXISTS "${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_driver.c
             -specs=nano.specs -specs=nosys.specs)
         add_custom_target(star_target_s32k148_powertrain_full_stack_demo
             DEPENDS star_s32k148_powertrain_full_stack_demo)
+
+        set(STAR_GITHUB_UDS_SOURCE
+            "${STAR_TASK_CONTROLLER_ROOT}/task_admission_framework/examples/github_uds_ecu_blind_holdout.c")
+        add_executable(star_s32k148_github_uds_blind_holdout
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_powertrain_full_stack_demo/main.c
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_flexcan_isr_latency/osif_flexcan_stub.c
+            ${STAR_GITHUB_UDS_SOURCE}
+            ${RTS_S32K148_SDK_FLEXCAN_BOARD}/clock_config.c
+            ${RTS_S32K148_SDK_FLEXCAN_BOARD}/peripherals_flexcan_config_1.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/startup.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/system_S32K148.c
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/startup/gcc/startup_S32K148.S
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx/clock_S32K1xx.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/interrupt/interrupt_manager.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_driver.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan/flexcan_hw_access.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_driver.c
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma/edma_hw_access.c)
+        set_target_properties(star_s32k148_github_uds_blind_holdout PROPERTIES
+            OUTPUT_NAME star_s32k148_github_uds_blind_holdout SUFFIX .elf)
+        target_include_directories(star_s32k148_github_uds_blind_holdout PRIVATE
+            ${PROJECT_SOURCE_DIR}/examples/s32k148_github_uds_blind_holdout
+            ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+            ${RTS_S32K148_SDK_FLEXCAN_BOARD}
+            ${STAR_TASK_CONTROLLER_ROOT}/task_admission_framework/examples
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/include
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148
+            ${RTS_S32K148_SDK_ROOT}/platform/devices/common
+            ${RTS_S32K148_SDK_ROOT}/platform/devices
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/inc
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/flexcan
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/edma
+            ${RTS_S32K148_SDK_ROOT}/platform/drivers/src/clock/S32K1xx
+            ${RTS_S32K148_SDK_ROOT}/rtos/osif)
+        target_compile_definitions(star_s32k148_github_uds_blind_holdout PRIVATE
+            CPU_S32K148 DEV_ERROR_DETECT
+            g_star_full_stack_complete=g_star_github_uds_complete
+            g_star_full_stack_current=g_star_github_uds_current
+            g_star_full_stack_results=g_star_github_uds_results)
+        target_compile_options(star_s32k148_github_uds_blind_holdout PRIVATE
+            -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+            -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+            -ffunction-sections -fdata-sections -mgeneral-regs-only)
+        target_link_libraries(star_s32k148_github_uds_blind_holdout PRIVATE gcc)
+        target_link_options(star_s32k148_github_uds_blind_holdout PRIVATE
+            -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -Wl,--gc-sections
+            -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_github_uds_blind_holdout>/star_s32k148_github_uds_blind_holdout.map
+            -T${RTS_S32K148_SDK_ROOT}/platform/devices/S32K148/linker/gcc/S32K148_256_flash.ld
+            -specs=nano.specs -specs=nosys.specs)
+        add_custom_target(star_target_s32k148_github_uds_blind_holdout
+            DEPENDS star_s32k148_github_uds_blind_holdout)
     endif()
 endif()
 endfunction()
@@ -2212,6 +2263,146 @@ if(DEFINED STAR_BENCHMARK_ROOT)
     target_link_libraries(star_s32k148_powertrain_ref PRIVATE rts_target_s32k148 rts_cortex_m4f_port gcc)
     target_link_options(star_s32k148_powertrain_ref PRIVATE -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib -Wl,--gc-sections -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_powertrain_ref>/star_s32k148_powertrain_reference.map -T${RTS_S32K148_LINKER_SCRIPT})
     add_custom_target(star_target_s32k148_powertrain_ref DEPENDS star_s32k148_powertrain_ref)
+
+    add_executable(star_s32k148_generalization_corpus
+        ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+        "${STAR_BENCHMARK_ROOT}/calibration/generalization_corpus.c"
+        "${STAR_BENCHMARK_ROOT}/board/integration/s32k148_generalization_corpus_main.c"
+        startup/startup_s32k148.S)
+    set_target_properties(star_s32k148_generalization_corpus PROPERTIES
+        OUTPUT_NAME star_s32k148_generalization_corpus SUFFIX .elf)
+    target_include_directories(star_s32k148_generalization_corpus PRIVATE
+        ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+        ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
+        ${CMAKE_CURRENT_SOURCE_DIR} "${STAR_BENCHMARK_ROOT}/calibration"
+        "${STAR_BENCHMARK_ROOT}/tasks/include"
+        "${STAR_BENCHMARK_ROOT}/board/include")
+    target_compile_definitions(star_s32k148_generalization_corpus PRIVATE
+        BENCHMARK_PLATFORM_CORTEX_M_DWT
+        BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h"
+        RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+        RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+        RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_generalization_corpus PRIVATE
+        -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+        -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+        -ffunction-sections -fdata-sections -Wall -Wextra -Werror
+        -Wpedantic -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_generalization_corpus PRIVATE
+        rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_generalization_corpus PRIVATE
+        -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib
+        -Wl,--gc-sections
+        -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_generalization_corpus>/star_s32k148_generalization_corpus.map
+        -T${RTS_S32K148_LINKER_SCRIPT})
+    add_custom_target(star_target_s32k148_generalization_corpus
+        DEPENDS star_s32k148_generalization_corpus)
+
+    add_executable(star_s32k148_generalization_holdout
+        ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+        "${STAR_BENCHMARK_ROOT}/calibration/generalization_holdout_tasks.c"
+        "${STAR_BENCHMARK_ROOT}/board/integration/s32k148_generalization_holdout_main.c"
+        startup/startup_s32k148.S)
+    set_target_properties(star_s32k148_generalization_holdout PROPERTIES
+        OUTPUT_NAME star_s32k148_generalization_holdout SUFFIX .elf)
+    target_include_directories(star_s32k148_generalization_holdout PRIVATE
+        ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+        ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
+        ${CMAKE_CURRENT_SOURCE_DIR} "${STAR_BENCHMARK_ROOT}/calibration"
+        "${STAR_BENCHMARK_ROOT}/tasks/include"
+        "${STAR_BENCHMARK_ROOT}/board/include")
+    target_compile_definitions(star_s32k148_generalization_holdout PRIVATE
+        BENCHMARK_PLATFORM_CORTEX_M_DWT
+        BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h"
+        RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+        RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+        RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_generalization_holdout PRIVATE
+        -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+        -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+        -ffunction-sections -fdata-sections -Wall -Wextra -Werror
+        -Wpedantic -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_generalization_holdout PRIVATE
+        rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_generalization_holdout PRIVATE
+        -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib
+        -Wl,--gc-sections
+        -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_generalization_holdout>/star_s32k148_generalization_holdout.map
+        -T${RTS_S32K148_LINKER_SCRIPT})
+    add_custom_target(star_target_s32k148_generalization_holdout
+        DEPENDS star_s32k148_generalization_holdout)
+
+    add_executable(star_s32k148_mixed_shape_corpus
+        ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+        "${STAR_BENCHMARK_ROOT}/calibration/mixed_shape_corpus.c"
+        "${STAR_BENCHMARK_ROOT}/board/integration/s32k148_mixed_shape_corpus_main.c"
+        startup/startup_s32k148.S)
+    set_target_properties(star_s32k148_mixed_shape_corpus PROPERTIES
+        OUTPUT_NAME star_s32k148_mixed_shape_corpus SUFFIX .elf)
+    target_include_directories(star_s32k148_mixed_shape_corpus PRIVATE
+        ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+        ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
+        ${CMAKE_CURRENT_SOURCE_DIR} "${STAR_BENCHMARK_ROOT}/calibration"
+        "${STAR_BENCHMARK_ROOT}/tasks/include"
+        "${STAR_BENCHMARK_ROOT}/board/include")
+    target_compile_definitions(star_s32k148_mixed_shape_corpus PRIVATE
+        BENCHMARK_PLATFORM_CORTEX_M_DWT
+        BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h"
+        RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+        RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+        RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_mixed_shape_corpus PRIVATE
+        -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+        -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+        -ffunction-sections -fdata-sections -Wall -Wextra -Werror
+        -Wpedantic -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_mixed_shape_corpus PRIVATE
+        rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_mixed_shape_corpus PRIVATE
+        -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib
+        -Wl,--gc-sections
+        -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_mixed_shape_corpus>/star_s32k148_mixed_shape_corpus.map
+        -T${RTS_S32K148_LINKER_SCRIPT})
+    add_custom_target(star_target_s32k148_mixed_shape_corpus
+        DEPENDS star_s32k148_mixed_shape_corpus)
+
+    add_executable(star_s32k148_mixed_shape_blind
+        ${RTS_S32K148_KERNEL_SOURCES} ${STAR_BENCHMARK_BOARD_SOURCES}
+        "${STAR_BENCHMARK_ROOT}/calibration/mixed_shape_blind_tasks.c"
+        "${STAR_BENCHMARK_ROOT}/board/integration/s32k148_mixed_shape_blind_main.c"
+        startup/startup_s32k148.S)
+    set_target_properties(star_s32k148_mixed_shape_blind PROPERTIES
+        OUTPUT_NAME star_s32k148_mixed_shape_blind SUFFIX .elf)
+    target_include_directories(star_s32k148_mixed_shape_blind PRIVATE
+        ${RTS_S32K148_DEVICE_INCLUDE_DIR} ${RTS_S32K148_CMSIS_INCLUDE_DIR}
+        ${RTS_CONFIG_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/kernel ${PROJECT_SOURCE_DIR}/ports/arm/cortex_m4f
+        ${CMAKE_CURRENT_SOURCE_DIR} "${STAR_BENCHMARK_ROOT}/calibration"
+        "${STAR_BENCHMARK_ROOT}/tasks/include"
+        "${STAR_BENCHMARK_ROOT}/board/include")
+    target_compile_definitions(star_s32k148_mixed_shape_blind PRIVATE
+        BENCHMARK_PLATFORM_CORTEX_M_DWT
+        BENCHMARK_CMSIS_DEVICE_HEADER="target_device.h"
+        RTS_CORTEX_M_NVIC_PRIORITY_BITS=${RTS_CORTEX_M_NVIC_PRIORITY_BITS}
+        RTS_CORTEX_M_PENDSV_PRIORITY=${RTS_CORTEX_M_PENDSV_PRIORITY}
+        RTS_CORTEX_M_SVC_PRIORITY=${RTS_CORTEX_M_SVC_PRIORITY})
+    target_compile_options(star_s32k148_mixed_shape_blind PRIVATE
+        -O0 -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -ffreestanding
+        -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables
+        -ffunction-sections -fdata-sections -Wall -Wextra -Werror
+        -Wpedantic -mgeneral-regs-only)
+    target_link_libraries(star_s32k148_mixed_shape_blind PRIVATE
+        rts_target_s32k148 rts_cortex_m4f_port gcc)
+    target_link_options(star_s32k148_mixed_shape_blind PRIVATE
+        -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -nostdlib
+        -Wl,--gc-sections
+        -Wl,-Map,$<TARGET_FILE_DIR:star_s32k148_mixed_shape_blind>/star_s32k148_mixed_shape_blind.map
+        -T${RTS_S32K148_LINKER_SCRIPT})
+    add_custom_target(star_target_s32k148_mixed_shape_blind
+        DEPENDS star_s32k148_mixed_shape_blind)
 
     set(STAR_COMPOUND_CALIBRATION_SOURCE
         "C:/Users/nxg19748/OneDrive - NXP/Desktop/real_time_scheduler_task_controller/task_admission_framework/examples/powertrain_compound_calibration.c")

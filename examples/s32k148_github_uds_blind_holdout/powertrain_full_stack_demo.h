@@ -1,0 +1,14 @@
+#ifndef STAR_GITHUB_UDS_COMPATIBILITY_H
+#define STAR_GITHUB_UDS_COMPATIBILITY_H
+
+#include "github_uds_ecu_blind_holdout.h"
+
+#define StarPowertrainDemo_Initialize StarGithubUds_Initialize
+#define StarIsr_AdcComplete StarGithubUds_Initialize
+#define StarTask_PedalAndTorqueControl_5ms StarTask_UdsRequestMatchSupported_5ms
+#define StarTask_SensorFusionAndSpeed_10ms StarTask_UdsPayloadPackSupported_10ms
+#define StarTask_TorqueLimiterAndTraction_20ms StarTask_UdsChecksumSupported_20ms
+#define StarTask_DiagnosticsAndPlausibility_50ms StarTask_DtcAndSessionMaintenance_50ms
+#define StarTask_CanObdAndNetworkManagement_100ms StarTask_ObdRequestAndCanTx_100ms
+
+#endif
